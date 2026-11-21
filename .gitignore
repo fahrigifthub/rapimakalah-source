@@ -1,0 +1,75 @@
+# Dependencies and package-manager artifacts
+node_modules/
+**/node_modules/
+
+# Build output and caches
+client/dist/
+server/dist/
+coverage/
+.vite/
+*.tsbuildinfo
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+server/.env
+server/.env.*
+!server/.env.example
+!server/.env.*.example
+deploy/.env
+deploy/cloudflared-config.yml
+deploy/setup-dns.ps1
+
+yarn-error.log*
+*.log
+
+# Local database files (never commit user data)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Uploaded documents, drafts, and user-generated storage
+server/storage/
+
+# Local backups, exported archives, and unrelated workspace files
+/backup/
+/backups/
+server/backups/
+*.zip
+/Analisis_LCD_LED_OLED_Kelompok_4.pptx
+/MANUAL_BOOK_RAPIMAKALAH.txt
+/make_ppt.py
+
+# DOCX samples/output: keep the synthetic regression fixture and user manual
+*.docx
+!server/test-fixture.docx
+docs/MANUAL-BOOK-RAPIMAKALAH.docx
+
+# Temporary test outputs and inspection helpers
+server/processed-fixture.docx
+server/debug-out.docx
+server/scripts/tmp-*
+client/scripts/tmp-*
+server/scripts/check-*-live.mjs
+client/scripts/check-*.js
+server/scripts/inspect.js
+server/scripts/inspect-toc.js
+server/scripts/safe-repair-document.mjs
+server/scripts/backup-layout-baseline.mjs
+server/scripts/repair-preface-quotes.mjs
+server/scripts/test-game-layout.mjs
+server/scripts/inspect-format-checks.mjs
+server/scripts/test-fiber-input.js
+server/scripts/test-writing-import.js
+server/scripts/fixtures/fiber-optic-user.md
+client/scripts/test-writing-roundtrip.js
+client/scripts/test-toc-browser.js
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

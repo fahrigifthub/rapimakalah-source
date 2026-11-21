@@ -1,0 +1,26 @@
+import assert from 'node:assert/strict';
+import { buildDocxFromText } from '../src/docx/fromText.js';
+import { repairBibliography } from '../src/docx/repairBibliography.js';
+import { formatDocument } from '../src/docx/formatBibliography.js';
+import { getBodyStructure, readDocxBuffer } from '../src/docx/reader.js';
+import { DEFAULT_TEMPLATE_CONFIG as config } from '../src/templates/defaults.js';
+
+const source = await buildDocxFromText('# BAB I PENDAHULUAN\n\n## 1.1 Contoh\n\nIsi makalah tetap utuh.\n\n# DAFTAR PUSTAKA\n\nBlender Foundation. (2026). *Blender Manual*.\nhttps://docs.blender.org/manual/en/latest/\n\nFullerton, T. (2018). *Game Design Workshop: A Playcentric Approach to\nCreating Innovative Games* (4th ed.). A K Peters/CRC Press.\n\nGregory, J. (2018). *Game Engine Architecture*. CRC Press.\n\n# LAMPIRAN\n\nIsi lampiran.');
+const xmlOf = async b => (await readDocxBuffer(b)).file('word/document.xml').async('string');
+const prepared = await repairBibliography(source);
+assert.equal(prepared.joined, 2);
+const textOf = async b => getBodyStructure(await xmlOf(b)).blocks.map(b => b.data?.plainText || '').join(' ').replaceAll('*', '').replace(/\s+/g, ' ').trim();
+assert.equal(await textOf(prepared.buffer), await textOf(source));
+assert.equal((await repairBibliography(prepared.buffer)).joined, 0);
+const result = await formatDocument(source, { config, options: { headings: true, firstLineIndent: true, font: true, fontSize: true, preface: false } });
+const blocks = getBodyStructure(await xmlOf(result.buffer)).blocks;
+const entries = blocks.filter(b => b.data?.styleId === 'Bibliography');
+assert.equal(entries.length, 3);
+assert.ok(entries[0].data.plainText.includes('https://docs.blender.org'));
+assert.ok(entries[1].data.runs.some(r => r.italic && r.text.includes('Creating Innovative Games')));
+for (const b of entries) assert.equal(b.data.hangingIndent, 720);
+assert.ok(!entries.some(b => b.data.plainText.includes('*')));
+const unmarked = await readDocxBuffer(source);
+unmarked.remove('rapimakalah/source.json');
+assert.equal((await repairBibliography(await unmarked.generateAsync({ type: 'nodebuffer' }))).joined, 0);
+console.log('PASS: Complete bibliography entries, preserved words/italics, hanging indents, section boundaries, idempotence and uploaded DOCX preservation.');

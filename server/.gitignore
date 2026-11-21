@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env*
+!.env.example
+!.env.*.example
+storage/
+prisma/*.db
+prisma/*.db-journal
+processed-fixture.docx
+debug-out.docx
+*.log
+.DS_Store

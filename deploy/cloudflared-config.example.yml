@@ -1,0 +1,10 @@
+# Salin ke cloudflared-config.yml pada mesin deploy, lalu isi ID dan path kredensial tunnel sendiri.
+tunnel: YOUR_TUNNEL_ID
+credentials-file: /path/to/your/cloudflared/YOUR_TUNNEL_ID.json
+
+ingress:
+  - hostname: example.com
+    service: http://localhost:4001
+  - hostname: www.example.com
+    service: http://localhost:4001
+  - service: http_status:404

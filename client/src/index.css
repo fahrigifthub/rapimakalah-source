@@ -1,0 +1,104 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    @apply bg-surface text-ink-900 font-sans antialiased;
+  }
+  ::selection {
+    @apply bg-brand-100 text-brand-800;
+  }
+  input,
+  select,
+  textarea,
+  button {
+    font: inherit;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 8px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@layer components {
+  .surface-card {
+    @apply rounded-xl border border-line bg-white shadow-card;
+  }
+  .field-label {
+    @apply mb-1.5 block text-[13px] font-medium text-ink-700;
+  }
+  .field-input {
+    @apply w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-50 disabled:cursor-not-allowed disabled:bg-slate-50;
+  }
+  .field-hint {
+    @apply mt-1.5 text-xs leading-relaxed text-ink-500;
+  }
+  .divider {
+    @apply border-t border-line;
+  }
+  .skeleton {
+    @apply animate-pulse rounded-md bg-slate-100;
+  }
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-100 focus-visible:border-brand-400;
+  }
+  .paper-shadow {
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 12px 32px -12px rgba(15, 23, 42, 0.16);
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+.docx-preview p {
+  margin: 0;
+}
+.docx-preview .doc-heading {
+  font-weight: 700;
+}
+.docx-preview table {
+  border-collapse: collapse;
+  width: 100%;
+}
+.docx-preview td {
+  border: 1px solid #d7dbe0;
+  padding: 3px 5px;
+  vertical-align: top;
+  font-size: 0.92em;
+}
+.docx-preview table.cover-members {
+  width: 90%;
+  margin-inline: auto;
+  table-layout: fixed;
+}
+.docx-preview table.cover-members td {
+  border: 0;
+  text-align: center;
+  font-size: inherit;
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+.docx-preview table.cover-members td { width: 50%; }

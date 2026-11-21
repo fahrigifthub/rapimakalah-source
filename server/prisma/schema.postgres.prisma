@@ -1,0 +1,85 @@
+// PostgreSQL variant of the Paperly schema.
+// To use PostgreSQL:
+//   1. Copy this file over prisma/schema.prisma
+//   2. Set DATABASE_URL="postgresql://user:pass@localhost:5432/paperly"
+//   3. Run `npm run db:push && npm run db:seed`
+// Json payloads are stored as strings in both variants so the application code
+// is portable across providers.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String           @id @default(cuid())
+  email        String           @unique
+  name         String
+  passwordHash String
+  institution  String?
+  programStudy String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  documents    Document[]
+  templates    FormatTemplate[]
+  activities   Activity[]
+}
+
+model FormatTemplate {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  category    String
+  isSystem    Boolean   @default(false)
+  ownerId     String?
+  owner       User?     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  config      String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  documents   Document[]
+
+  @@index([ownerId])
+  @@index([isSystem])
+}
+
+model Document {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  originalName  String
+  storedName    String
+  mimeType      String
+  size          Int
+  status        String    @default("uploaded")
+  templateId    String?
+  template      FormatTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  config        String?
+  options       String?
+  issues        String?
+  headings      String?
+  stats         String?
+  pageCount     Int?
+  processedName String?
+  processedSize Int?
+  processedAt   DateTime?
+  errorMessage  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userId, createdAt])
+}
+
+model Activity {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type       String
+  message    String
+  documentId String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt])
+}

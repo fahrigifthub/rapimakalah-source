@@ -1,0 +1,84 @@
+// Paperly database schema — SQLite for zero-config local development.
+// A PostgreSQL variant is provided in schema.postgres.prisma (see README).
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String           @id @default(cuid())
+  email        String           @unique
+  name         String
+  passwordHash String
+  institution  String?
+  programStudy String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  role         String           @default("user") // "user" | "admin"
+  documents    Document[]
+  templates    FormatTemplate[]
+  activities   Activity[]
+}
+
+model FormatTemplate {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  category    String
+  isSystem    Boolean   @default(false)
+  ownerId     String?
+  owner       User?     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  config      String // JSON-serialized TemplateConfig
+  shareId     String?   @unique // kode berbagi publik; null = tidak dibagikan
+  sharedAt    DateTime?
+  importedFrom String? // kode berbagi asal, untuk jejak template impor
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  documents   Document[]
+
+  @@index([ownerId])
+  @@index([isSystem])
+}
+
+model Document {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  originalName  String
+  storedName    String
+  mimeType      String
+  size          Int
+  status        String    @default("uploaded") // uploaded | processing | ready | failed
+  templateId    String?
+  template      FormatTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  config        String? // JSON: last formatting settings
+  options       String? // JSON: enabled rule toggles
+  issues        String? // JSON: last checker report
+  headings      String? // JSON: detected headings
+  stats         String? // JSON: document statistics
+  pageCount     Int?
+  processedName String?
+  processedSize Int?
+  processedAt   DateTime?
+  errorMessage  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userId, createdAt])
+}
+
+model Activity {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type       String // upload | format | check | delete | template
+  message    String
+  documentId String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt])
+}

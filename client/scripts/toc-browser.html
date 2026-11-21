@@ -1,0 +1,13 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>TOC browser regression</title></head>
+<body style="background:#eee;padding:24px">
+<div class="writing-sheet-frame" style="width:794px;--writing-page-height:1123px;--writing-page-stride:1147px;--writing-margin-left:151px;--writing-margin-right:113px;--writing-margin-top:113px;--writing-margin-bottom:113px"><div class="writing-paper" style="background:white"></div></div>
+<script type="module">
+import { Editor } from '@tiptap/core';
+import StarterKit from '@tiptap/starter-kit';
+import { ParagraphLayout, TocTitle, TocPageNumber, WritingTocLeader, WritingTab, NumberLabel } from '../src/components/writing/WritingExtensions.js';
+import { updateToc } from '../src/components/writing/updateToc.js';
+import '../src/pages/Writing.css';
+window.editor = new Editor({ element: document.querySelector('.writing-paper'), extensions: [StarterKit, ParagraphLayout, TocTitle, TocPageNumber, WritingTocLeader, WritingTab, NumberLabel] });
+window.updateToc = () => updateToc(window.editor);
+</script></body></html>

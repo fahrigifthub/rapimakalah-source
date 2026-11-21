@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import { buildPreviewPages } from '../src/docx/preview.js';
+import { DEFAULT_TEMPLATE_CONFIG } from '../src/templates/defaults.js';
+
+const paragraph = (text, props = '') => `<w:p><w:pPr>${props}</w:pPr><w:r><w:t>${text}</w:t></w:r></w:p>`;
+const frame = '<w:framePr w:yAlign="bottom"/><w:jc w:val="right"/>';
+const signature = ['Kota Contoh, 16 November 2026', 'Penulis,', 'Nama Penulis'];
+const body = paragraph('Isi kata pengantar yang memenuhi sebagian besar halaman. '.repeat(65));
+const xml = `<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body}${signature.map((text, i) => paragraph(text, frame + `<w:spacing w:line="360" w:after="${i < 2 ? 960 : 0}"/>`)).join('')}</w:body></w:document>`;
+const preview = buildPreviewPages(xml, new Map(), DEFAULT_TEMPLATE_CONFIG);
+const signaturePages = preview.pages.filter(page => page.blocks.some(block => block.bottomFrame));
+assert.equal(signaturePages.length, 1, 'Date, signature label and author stay on the same page');
+assert.deepEqual(signaturePages[0].blocks.filter(block => block.bottomFrame).map(block => block.text), signature);
+assert.ok(signaturePages[0].blocks.filter(block => block.bottomFrame).every(block => block.alignment === 'right' && block.firstLineIndent === null));
+const parts = signaturePages[0].blocks.filter(block => block.bottomFrame);
+assert.equal(parts[0].spaceBefore, 12, 'Date follows the last paragraph with a small gap');
+assert.equal(parts[0].spaceAfter, 0, 'Date and signature label stay adjacent');
+assert.equal(parts[1].spaceAfter, 36, 'Writing space remains before the author name');
+assert.equal(parts[2].spaceAfter, 0);
+assert.ok(preview.pages.every(page => page.blocks.length), 'Moving a signature does not leave blank pages');
+console.log('PASS: The complete bottom signature stays together, right-aligned, without blank pages.');

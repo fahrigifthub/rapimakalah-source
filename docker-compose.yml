@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: paperly-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: paperly
+      POSTGRES_USER: paperly
+      POSTGRES_PASSWORD: paperly_dev_password
+    ports:
+      - '5432:5432'
+    volumes:
+      - paperly_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U paperly -d paperly']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  paperly_pgdata:
