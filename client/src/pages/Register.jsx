@@ -1,23 +1,41 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { AuthFooter, AuthLayout, PasswordField, SubmitButton } from './AuthShared.jsx';
+import { AuthFooter, AuthLayout, GoogleAuthOption, PasswordField, SubmitButton } from './AuthShared.jsx';
 import { Field, Input } from '../components/ui/Form.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
+import { safeNextPath } from '../lib/safeNext.js';
 
 export default function Register() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const { register } = useAuth();
+  const { register, googleLogin } = useAuth();
   const { success } = useToast();
   const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   // Kembali ke halaman asal (mis. tautan template) setelah akun dibuat.
-  const nextParam = params.get('next') || '';
-  const nextPath = nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '/app';
+  const nextPath = safeNextPath(params.get('next'), '/app');
+
+  const handleGoogleError = useCallback((message) => {
+    setError(message);
+  }, []);
+
+  const handleGoogleCredential = useCallback(async (credential) => {
+    setError('');
+    setLoading(true);
+    try {
+      await googleLogin(credential);
+      success('Akun berhasil dibuat', { description: 'Selamat datang di RapiMakalah.' });
+      navigate(nextPath);
+    } catch (err) {
+      setError(err.message || 'Gagal melanjutkan dengan Google.');
+    } finally {
+      setLoading(false);
+    }
+  }, [googleLogin, navigate, nextPath, success]);
 
   const update = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
 
@@ -82,6 +100,7 @@ export default function Register() {
           dan tidak dipakai untuk pelatihan model AI.
         </p>
       </form>
+      <GoogleAuthOption onCredential={handleGoogleCredential} onError={handleGoogleError} disabled={loading} />
       <AuthFooter prompt="Sudah punya akun?" to="/login" label="Masuk" />
     </AuthLayout>
   );

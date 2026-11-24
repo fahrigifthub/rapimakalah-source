@@ -98,7 +98,10 @@
   border: 0;
   text-align: center;
   font-size: inherit;
+  font-weight: 400;
   white-space: nowrap;
   overflow-wrap: normal;
 }
-.docx-preview table.cover-members td { width: 50%; }
+.docx-preview table.cover-members td:first-child { width: 50%; }
+.docx-preview table.cover-members td:last-child { width: 50%; }
+.docx-preview table.cover-members td:only-child { width: 100%; }

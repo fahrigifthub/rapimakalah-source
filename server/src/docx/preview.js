@@ -80,20 +80,23 @@ function imageSizes(blockXml) {
 
 function tableForPreview(tableXml, images) {
   const rows = [];
+  let headerRows = 0;
   const rowRe = /<w:tr\b[^>]*>([\s\S]*?)<\/w:tr>/g;
   let rowMatch;
   while ((rowMatch = rowRe.exec(tableXml)) && rows.length < 40) {
+    if (/<w:tblHeader\b/.test(rowMatch[0])) headerRows = rows.length + 1;
     const cells = [];
     const cellRe = /<w:tc\b[^>]*>([\s\S]*?)<\/w:tc>/g;
     let cellMatch;
     while ((cellMatch = cellRe.exec(rowMatch[1])) && cells.length < 12) {
       const text = textFromXml(cellMatch[1].replace(/<w:tcPr>[\s\S]*?<\/w:tcPr>/, '')).replace(/\s+/g, ' ').trim();
+      const align = /<w:jc w:val="([a-z]+)"\/>/.exec(cellMatch[1])?.[1] || null;
       const refs = imageRefs(cellMatch[1]);
-      cells.push({ text, images: refs.map((id) => images[id]).filter(Boolean).slice(0, 2) });
+      cells.push({ text, align, images: refs.map((id) => images[id]).filter(Boolean).slice(0, 2) });
     }
     rows.push(cells);
   }
-  return rows;
+  return { rows, headerRows };
 }
 
 /**
@@ -292,7 +295,13 @@ export function buildPreviewPages(documentXml, styles, config, images = {}, numb
 
   const processParagraph = (block, key) => {
     const p = block.data;
-    const inCover = isCoverEnabled && coverEnd !== null && block.index <= coverEnd;
+    const bottomFrame = /<w:framePr\b[^>]*w:yAlign="bottom"/.test(block.xml);
+    // Uploaded DOCX files can have their bottom institution block after a
+    // page-break carrier or a misclassified cover boundary. Its explicit
+    // bottom frame plus institution label is reliable evidence that it belongs
+    // to the cover, and lets the preview anchor it to the page bottom too.
+    const institutionFrame = bottomFrame && /PROGRAM\s+STUDI|FAKULTAS|UNIVERSITAS/i.test(p.plainText);
+    const inCover = isCoverEnabled && ((coverEnd !== null && block.index <= coverEnd) || institutionFrame);
     if (bodyStart !== null && block.index === bodyStart && !lastWasBody) {
       pendingBreak = true;
       lastWasBody = true;
@@ -334,7 +343,6 @@ export function buildPreviewPages(documentXml, styles, config, images = {}, numb
       }
       const mathLines = segmentRuns.reduce((sum, run) => sum + (run.math ? (run.display ? 3 : 0.5) : 0), 0);
       const refs = imageRefs(block.xml);
-      const bottomFrame = /<w:framePr\b[^>]*w:yAlign="bottom"/.test(block.xml);
       const previewBlock = {
         id: `${key}-${segIndex}`,
         blockIndex: block.index,
@@ -353,7 +361,7 @@ export function buildPreviewPages(documentXml, styles, config, images = {}, numb
         keepNext: /<w:keepNext\b(?![^>]*w:val="(?:0|false|off)")/.test(block.xml) && !bottomFrame,
         headingLevel: isHeading ? headingMap.get(block.index) : null,
         styleId: p.styleId,
-        firstLineIndent: inCover || bottomFrame ? null : !hangingTwips && p.firstLineIndent ? p.firstLineIndent / TWIPS_PER_CM : formatted && formatOptions.firstLineIndent && !p.hasNumbering && !isHeading ? typography.firstLineIndent : null,
+        firstLineIndent: inCover || bottomFrame ? null : p.hasExplicitFirstLineIndent ? (p.firstLineIndent ? p.firstLineIndent / TWIPS_PER_CM : null) : !hangingTwips && p.firstLineIndent ? p.firstLineIndent / TWIPS_PER_CM : formatted && formatOptions.firstLineIndent && !p.hasNumbering && !isHeading ? typography.firstLineIndent : null,
         leftIndent: inCover ? null : leftTwips ? leftTwips / TWIPS_PER_CM : null,
         hangingIndent: inCover ? null : hangingTwips ? hangingTwips / TWIPS_PER_CM : null,
         numberMarker: inCover ? null : segIndex === 0 ? listInfo.marker : null,
@@ -432,14 +440,7 @@ export function buildPreviewPages(documentXml, styles, config, images = {}, numb
       newPage();
       pendingBreak = false;
     }
-    const rows = tableForPreview(block.xml, images);
-    if (block.xml.includes('RapiMakalah Cover Members')) {
-      rows.forEach((row, index) => {
-        const text = row[1]?.text ? `${row[0]?.text || ''} (${row[1].text})` : row[0]?.text || '';
-        pushBlock({ id: `${key}-${index}`, blockIndex: block.index, type: 'paragraph', text, runs: [{ text, bold: true }], alignment: 'center', isCover: true }, Math.max(1, Math.ceil(text.length / charsPerLine)));
-      });
-      return;
-    }
+    const { rows, headerRows } = tableForPreview(block.xml, images);
     const rowCount = rows.length || 1;
     const lines = Math.min(linesPerPage, rowCount * 2);
     pushBlock(
@@ -449,6 +450,7 @@ export function buildPreviewPages(documentXml, styles, config, images = {}, numb
         type: 'table',
         isMemberTable: /<w:tblCaption\b[^>]*w:val="RapiMakalah Cover Members"/.test(block.xml),
         rows,
+        headerRows,
         isEmpty: rows.length === 0,
         isCover: inCover,
       },

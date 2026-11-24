@@ -28,6 +28,13 @@ import { fillTableOfContents } from './toc.js';
 import { normalizePastedDocument } from './normalize.js';
 import { isLetteredLabel, bodyAlignment } from './paragraphRules.js';
 import { buildCoverXml, para, buildPrefaceXml, logoPara, classifyPrefaceBlocks, SIGNATURE_FRAME, indonesianDate } from './frontmatter.js';
+import { normalizeCoverTables, refreshCoverMembers } from './coverTables.js';
+import { buildCoverMembersTable } from './coverMembers.js';
+import { ensureContentTypes } from './contentTypes.js';
+import { formatTextTables } from './formatTextTables.js';
+import { convertPipeParagraphTables } from './convertPipeParagraphTables.js';
+import { applyListContinuationIndent, applyNumberedListIndent, numberedListTextIndent } from './listIndent.js';
+import { convertTypedNumberedLists } from './typedNumbering.js';
 
 const PREFACE_TITLE = /^kata\s+pengantar$/i;
 const BIB_TITLE = /^(daftar\s+pustaka|referensi|references|bibliography)$/i;
@@ -52,7 +59,11 @@ function normalizeCoverParagraph(xml) {
   let out = setParagraphProperty(xml, 'w:numPr', '');
   out = setParagraphProperty(out, 'w:ind', '<w:ind w:left="0" w:right="0" w:firstLine="0" w:hanging="0"/>');
   out = setParagraphProperty(out, 'w:jc', '<w:jc w:val="center"/>');
-  out = setParagraphProperty(out, 'w:framePr', '');
+  // Keep bottom-anchored institution paragraphs pinned to the page margin;
+  // other inherited frames are removed when normalizing cover content.
+  if (!/<w:framePr\b[^>]*w:yAlign="bottom"/.test(out)) {
+    out = setParagraphProperty(out, 'w:framePr', '');
+  }
   // Inline images follow paragraph alignment. For anchored pictures the anchor
   // position controls alignment, so make that position relative to the page.
   return out.replace(/<wp:positionH\b([^>]*)>([\s\S]*?)<\/wp:positionH>/g, (_match, attrs, inner) => {
@@ -64,7 +75,66 @@ function normalizeCoverParagraph(xml) {
 }
 
 function normalizeCoverTable(xml) {
-  return xml.replace(/<w:p\b[\s\S]*?<\/w:p>/g, normalizeCoverParagraph);
+  const isMemberTable = /<w:tblCaption\b[^>]*w:val="RapiMakalah Cover Members"/.test(xml);
+  return xml.replace(/<w:p\b[\s\S]*?<\/w:p>/g, (paragraph) => {
+    const normalized = normalizeCoverParagraph(paragraph);
+    if (!isMemberTable) return normalized;
+
+    // Hilangkan bold dari run anggota agar nama dan NIM tetap regular meski
+    // paragraf atau style sumbernya mewarisi format tebal.
+    return normalized.replace(/<w:b(?:Cs)?\b[^>]*\/?\s*>/g, '<w:b w:val="0"/>');
+  });
+}
+
+const INSTITUTION_ANCHOR = /PROGRAM\s+STUDI|FAKULTAS|UNIVERSITAS/i;
+const INSTITUTION_PART = /PROGRAM\s+STUDI|FAKULTAS|UNIVERSITAS|DEPARTEMEN/i;
+const YEAR_LINE = /^(?:19|20)\d{2}$/;
+
+/**
+ * Kumpulkan paragraf blok institusi di area cover. Blok ini bisa berupa satu
+ * paragraf gabungan (cover baru) atau beberapa paragraf berurutan (cover lama).
+ */
+function coverInstitutionBlocks(blocks, coverEnd) {
+  const limit = coverEnd ?? blocks.length - 1;
+  const inCover = blocks.filter((block) => block.index <= limit && block.type === 'w:p' && block.data);
+  const start = inCover.findIndex((block) => INSTITUTION_ANCHOR.test(block.data.plainText));
+  if (start < 0) return [];
+
+  const group = [];
+  for (let i = start; i < inCover.length; i += 1) {
+    const text = inCover[i].data.plainText.trim();
+    if (!text) continue;
+    if (!INSTITUTION_PART.test(text) && !YEAR_LINE.test(text)) break;
+    group.push(inCover[i]);
+  }
+  return group;
+}
+
+/** Satu paragraf berisi semua baris institusi; baris dipisah <w:br/>. */
+function buildPinnedInstitutionParagraph(config, text) {
+  const size = Number(config.cover?.institutionSize) || Number(config.cover?.titleSize) || 16;
+  return para(config, text, {
+    align: 'center',
+    bold: true,
+    size,
+    line: 276,
+    frame: coverInstitutionFrame(config),
+    keepLines: true,
+  });
+}
+
+/** Pertahankan line break yang sudah ada, cukup tambahkan frame bawah. */
+function pinInstitutionParagraph(xml, config) {
+  const normalized = normalizeCoverParagraph(xml);
+  const framed = setParagraphProperty(normalized, 'w:framePr', coverInstitutionFrame(config));
+  return setParagraphProperty(framed, 'w:keepLines', '<w:keepLines/>');
+}
+
+function coverInstitutionFrame(config) {
+  const page = PAGE_DIMENSIONS_TWIPS[config.page.size] || PAGE_DIMENSIONS_TWIPS.A4;
+  const pageWidth = config.page.orientation === 'landscape' ? page.height : page.width;
+  const textWidth = pageWidth - Math.round(((config.page.margins.left + config.page.margins.right) / 2.54) * 1440);
+  return `<w:framePr w:w="${textWidth}" w:hSpace="0" w:wrap="notBeside" w:vAnchor="margin" w:hAnchor="margin" w:xAlign="center" w:yAlign="bottom"/>`;
 }
 
 // TOC lives in a w:sdt wrapper that the paragraph loop never visits. Normalise
@@ -519,9 +589,17 @@ export async function formatDocument(inputBuffer, { config, options = {}, bounda
   // including documents downloaded and uploaded again.
   documentXml = documentXml.replaceAll('\u00e2\u20ac\u0153', '\u201c').replaceAll('\u00e2\u20ac\u009d', '\u201d');
   let stylesXml = (await zip.file('word/styles.xml')?.async('string')) || '';
+  let numberingXml = (await zip.file('word/numbering.xml')?.async('string')) || '';
   const styles = parseStyles(stylesXml);
   const operationLog = [];
   const warnings = [];
+  const convertedLists = convertTypedNumberedLists(documentXml, numberingXml);
+  documentXml = convertedLists.documentXml;
+  numberingXml = convertedLists.numberingXml;
+  if (convertedLists.count) operationLog.push(`Daftar bernomor teks diubah ke numbering Word (${convertedLists.count} item)`);
+  const repairedPipeTables = convertPipeParagraphTables(documentXml);
+  documentXml = repairedPipeTables.documentXml;
+  if (repairedPipeTables.count) operationLog.push(`Tabel Markdown terdeteksi ulang (${repairedPipeTables.count})`);
 
   if (options.cover && config.cover?.defaults) {
     const merged = { ...meta };
@@ -591,29 +669,48 @@ export async function formatDocument(inputBuffer, { config, options = {}, bounda
     }
   }
 
-  // Restore tables created by earlier versions to ordinary cover paragraphs.
-  if (options.cover) {
-    const pre = getBodyStructure(documentXml);
-    for (const block of [...pre.blocks].reverse()) {
-      if (block.type !== 'w:tbl' || !block.xml.includes('RapiMakalah Cover Members')) continue;
-      const lines = [...block.xml.matchAll(/<w:tr\b[^>]*>([\s\S]*?)<\/w:tr>/g)].map(row => {
-        const cells = [...row[1].matchAll(/<w:tc\b[^>]*>([\s\S]*?)<\/w:tc>/g)].map(cell => parseParagraph(cell[1]).plainText);
-        return cells[1] ? `${cells[0]} (${cells[1]})` : cells[0];
-      });
-      if (!lines.length) continue;
-      documentXml = documentXml.slice(0, pre.bodyRange.openEnd + block.start) + lines.map(text => para(config, text, { align: 'center', bold: true, line: 276 })).join('') + documentXml.slice(pre.bodyRange.openEnd + block.end);
-      if (boundaries) {
-        boundaries = { ...boundaries };
-        for (const key of ['coverEnd', 'bodyStart']) {
-          if (Number.isInteger(boundaries[key]) && boundaries[key] >= block.index) boundaries[key] += lines.length - 1;
-        }
-      }
-    }
-  }
+  // Tabel anggota cover (caption "RapiMakalah Cover Members") sengaja
+  // dipertahankan: border-nya transparan dan kolom nama/NIM menjaga
+  // kesejajaran saat anggota bertambah.
 
   let structure = getBodyStructure(documentXml);
   let headings = detectHeadings(structure.blocks, styles);
-  const autoBoundaries = computeBoundaries(structure.blocks, headings);
+  let autoBoundaries = computeBoundaries(structure.blocks, headings);
+  if (options.cover || options.preserveCover) {
+    const coverEndIndex = boundaries?.coverEnd ?? autoBoundaries.coverEnd;
+    let coverChanged = false;
+    // Sembunyikan bordernya dan buang baris judul "Nama | NIM" tanpa mengubah
+    // tabel isi makalah.
+    const normalizedTables = normalizeCoverTables(documentXml, coverEndIndex);
+    if (normalizedTables.changed) {
+      documentXml = normalizedTables.documentXml;
+      operationLog.push('Garis tabel cover disembunyikan');
+      coverChanged = true;
+    }
+    // Cover lama menyimpan anggota sebagai baris "NAMA (NIM)". Ubah menjadi
+    // tabel dua kolom supaya nama dan NIM tetap sejajar.
+    const coverMembers = (meta.members || []).filter(
+      (member) => member && String(member.name || '').trim(),
+    );
+    if (options.cover && coverMembers.some((member) => String(member.nim || '').trim())) {
+      const refreshed = refreshCoverMembers(
+        documentXml,
+        coverEndIndex,
+        coverMembers,
+        buildCoverMembersTable(config, coverMembers, { line: 276, makeParagraph: para }),
+      );
+      if (refreshed.changed) {
+        documentXml = refreshed.documentXml;
+        operationLog.push('Baris anggota cover dirapikan menjadi tabel');
+        coverChanged = true;
+      }
+    }
+    if (coverChanged) {
+      structure = getBodyStructure(documentXml);
+      headings = detectHeadings(structure.blocks, styles);
+      autoBoundaries = computeBoundaries(structure.blocks, headings);
+    }
+  }
   const resolvedBoundaries = {
     bodyStart: boundaries?.bodyStart ?? autoBoundaries.bodyStart,
     coverEnd: boundaries?.coverEnd ?? autoBoundaries.coverEnd,
@@ -654,6 +751,11 @@ export async function formatDocument(inputBuffer, { config, options = {}, bounda
 
   const blocks = structure.blocks;
   const edits = [];
+  const institutionBlocks = (options.cover || options.preserveCover) && config.cover?.institutionAtBottom !== false
+    ? coverInstitutionBlocks(blocks, coverEnd)
+    : [];
+  const institutionFirst = institutionBlocks[0] || null;
+  const institutionRest = new Set(institutionBlocks.slice(1).map((block) => block.index));
 
   // Existing "KATA PENGANTAR": normalise title, body and signature block.
   const prefaceIdx = blocks.find((b) => b.type === 'w:p' && b.data && PREFACE_TITLE.test(b.data.plainText) && (coverEnd === null || b.index > coverEnd))?.index ?? null;
@@ -689,6 +791,7 @@ export async function formatDocument(inputBuffer, { config, options = {}, bounda
 
   let bodyLeft = 0;
   let subLeft = 0;
+  let listContinuationIndent = null;
   const bibHang = Math.round(((config.bibliography?.hangingIndent ?? 1.27) / 2.54) * 1440);
   const hyperlinks = [];
   const addLink = (url) => {
@@ -700,6 +803,20 @@ export async function formatDocument(inputBuffer, { config, options = {}, bounda
   const tabLevels = new Set();
   for (const block of blocks) {
     const inCover = (options.cover || options.preserveCover) && coverEnd !== null && block.index <= coverEnd;
+    if (institutionRest.has(block.index)) {
+      edits.push({ block, xml: '' });
+      continue;
+    }
+    if (institutionFirst && block.index === institutionFirst.index) {
+      // Gabungkan beberapa baris institusi lama menjadi satu paragraf agar
+      // tidak ada beberapa frame yang masing-masing menempel ke bawah halaman.
+      const lines = institutionBlocks.map((candidate) => candidate.data.plainText.trim()).filter(Boolean);
+      const xml = lines.length > 1
+        ? buildPinnedInstitutionParagraph(config, lines.join('\n'))
+        : pinInstitutionParagraph(institutionFirst.xml, config);
+      edits.push({ block, xml });
+      continue;
+    }
     if (inCover && block.type === 'w:tbl') {
       edits.push({ block, xml: normalizeCoverTable(block.xml) });
       continue;
@@ -722,6 +839,7 @@ export async function formatDocument(inputBuffer, { config, options = {}, bounda
     if (role) {
       bodyLeft = 0;
       subLeft = 0;
+      listContinuationIndent = null;
     }
     const isHeading = Boolean(role);
     const levelConfig = isHeading ? headingConfig[role] || config.headings.subsubheading : null;
@@ -826,14 +944,13 @@ export async function formatDocument(inputBuffer, { config, options = {}, bounda
       const align = bodyAlignment(block.xml, typography.alignment);
       xml = setParagraphProperty(xml, 'w:jc', `<w:jc w:val="${align}"/>`);
     }
-    if (options.firstLineIndent && block.data.plainText && !block.data.hasNumbering) {
+    if (block.data.hasNumbering) {
+      xml = applyNumberedListIndent(xml);
+      listContinuationIndent = numberedListTextIndent(block.data.ilvl || 0);
+    } else if (listContinuationIndent !== null && block.data.plainText.trim()) {
+      xml = applyListContinuationIndent(xml, listContinuationIndent);
+    } else if (options.firstLineIndent && block.data.plainText) {
       xml = setIndent(xml, typography.firstLineIndent, bodyLeft);
-    } else if (options.firstLineIndent && block.data.hasNumbering) {
-      xml = clampListIndent(xml);
-      if (bodyLeft) {
-        const hang = 425;
-        xml = setParagraphProperty(xml, 'w:ind', `<w:ind w:left="${bodyLeft + hang}" w:right="0" w:hanging="${hang}"/>`);
-      }
     } else if (options.firstLineIndent) {
       xml = setIndent(xml, 0);
     }
@@ -861,6 +978,14 @@ export async function formatDocument(inputBuffer, { config, options = {}, bounda
     bodyInner = bodyInner.slice(0, edit.block.start) + edit.xml + bodyInner.slice(edit.block.end);
   }
   operationLog.push(`Format ${formattedParagraphs} paragraf`);
+
+  // Tabel Markdown tempelan perlu spasi baris template di sel. Hanya tabel
+  // ber-caption buatan modul baru yang ditangani; tabel pengguna tidak berubah.
+  const formattedTablesXml = formatTextTables(bodyInner, { typography, options });
+  if (formattedTablesXml !== bodyInner) {
+    bodyInner = formattedTablesXml;
+    operationLog.push('Spasi tabel teks diselaraskan dengan template');
+  }
 
   // Font & size inside tables (content text runs only).
   if (options.font || options.fontSize) {
@@ -999,9 +1124,9 @@ export async function formatDocument(inputBuffer, { config, options = {}, bounda
     if (rels) zip.file(relsPath, rels.replace('</Relationships>', add + '</Relationships>'));
   }
   if (tabLevels.size) {
-    const numXml = await zip.file('word/numbering.xml')?.async('string');
-    if (numXml) zip.file('word/numbering.xml', setNumberSuffixTab(numXml, tabLevels));
+    if (numberingXml) numberingXml = setNumberSuffixTab(numberingXml, tabLevels);
   }
+  if (numberingXml) zip.file('word/numbering.xml', numberingXml);
   zip.file('word/document.xml', documentXml);
   if (stylesXml) zip.file('word/styles.xml', stylesXml);
   const settings = await zip.file('word/settings.xml')?.async('string');
@@ -1016,6 +1141,9 @@ export async function formatDocument(inputBuffer, { config, options = {}, bounda
   const pageEstimate = estimatePageCount(stats, config);
   const sections = getSectionProperties(finalStructure.blocks);
 
+  // Dokumen lama bisa memiliki part tanpa content type (mis. source.json),
+  // yang membuat Word menolak file. Tambal sebelum paket ditulis.
+  await ensureContentTypes(zip);
   const output = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } });
 
   return {

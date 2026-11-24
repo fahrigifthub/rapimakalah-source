@@ -113,7 +113,14 @@ function PreviewTable({ block }) {
           {block.rows.map((row, rowIndex) => (
             <tr key={rowIndex}>
               {row.map((cell, cellIndex) => (
-                <td key={cellIndex} className="text-ink-800">
+                <td
+                  key={cellIndex}
+                  className="text-ink-800"
+                  style={{
+                    fontWeight: block.headerRows && rowIndex < block.headerRows ? 600 : undefined,
+                    textAlign: cell.align === 'center' ? 'center' : cell.align === 'right' ? 'right' : undefined,
+                  }}
+                >
                   {cell.images?.map((src, imageIndex) => (
                     <img key={imageIndex} src={src} alt="" className="mb-1 max-h-24 max-w-full object-contain" />
                   ))}
@@ -188,7 +195,9 @@ export const DocumentPreview = forwardRef(function DocumentPreview(
                 fontWeight: level ? 700 : undefined,
                 fontSize: level ? fontPx(headingSize) : undefined,
                 textTransform: level === 1 && headingCfg.chapter?.uppercase ? 'uppercase' : undefined,
-                marginTop: level ? fontPx(meta.fontSize) * 0.55 : block.spaceBefore ? fontPx(block.spaceBefore) : undefined,
+                marginTop: block.bottomFrame && block.isCover
+                  ? 'auto'
+                  : level ? fontPx(meta.fontSize) * 0.55 : block.spaceBefore ? fontPx(block.spaceBefore) : undefined,
                 marginBottom: level ? fontPx(meta.fontSize) * 0.55 : block.spaceAfter ? fontPx(block.spaceAfter) : undefined,
                 paddingLeft: block.leftIndent ? `${block.leftIndent * pxPerCm}px` : undefined,
                 textIndent: block.isCover

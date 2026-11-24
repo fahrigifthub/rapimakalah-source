@@ -3,6 +3,7 @@ import { prisma } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
 import { asyncHandler, HttpError } from '../middleware/error.js';
 import { normalizeTemplateConfig } from '../templates/defaults.js';
+import { PUBLIC_OWNER_SELECT, publicOwner } from '../templates/publicOwner.js';
 
 /**
  * Berbagi template lewat tautan publik.
@@ -24,9 +25,7 @@ function publicTemplate(template) {
     description: template.description,
     category: template.category,
     config: normalizeTemplateConfig(JSON.parse(template.config)),
-    ownerName: template.owner?.name || 'Pengguna RapiMakalah',
-    ownerInstitution: template.owner?.institution || null,
-    ownerProgramStudy: template.owner?.programStudy || null,
+    ...publicOwner(template.owner),
     sharedAt: template.sharedAt,
     updatedAt: template.updatedAt,
   };
@@ -37,7 +36,7 @@ shareRouter.get(
   asyncHandler(async (req, res) => {
     const template = await prisma.formatTemplate.findUnique({
       where: { shareId: req.params.shareId },
-      include: { owner: { select: { name: true, institution: true, programStudy: true } } },
+      include: { owner: { select: PUBLIC_OWNER_SELECT } },
     });
     if (!template) throw new HttpError(404, 'Tautan template tidak ditemukan atau sudah dicabut pemiliknya.');
     res.json({ template: publicTemplate(template) });

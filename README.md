@@ -24,8 +24,15 @@ Workspace Menulis juga mendukung penggaris indent kiri/kanan/baris pertama (drag
 
 Draft editor disimpan di `server/storage/writing/<userId>/<draftId>.json`; ikut sertakan seluruh folder storage saat backup. Endpoint `/api/writing` (GET/POST), `/api/writing/:id` (GET/PUT/DELETE), dan `/api/writing/:id/download` (GET) memerlukan login dan hanya mengakses folder pengguna yang bersangkutan.
 
-| Tanggal | Ringkasan |
+| Tanggal | Ringkasan (terbaru di atas) |
 | --- | --- |
+| 2026-11-24 | Login/daftar dengan Google opsional, kelola password dan hapus akun dengan verifikasi ulang; JWT produksi wajib memakai secret kuat |
+| 2026-11-24 | Perlindungan upload DOCX memeriksa ukuran ZIP sebelum ekstraksi; preview terbaru tidak lagi tertukar dengan cache lama |
+| 2026-11-24 | Preview cover menahan blok institusi di bagian bawah; tabel Markdown dari DOCX lama dipulihkan meski antarbaris disela paragraf kosong |
+| 2026-11-24 | Daftar bernomor literal dari DOCX lama dikonversi ke numbering Word dan paragraf penjelas sejajar dengan teks item |
+| 2026-11-22 | Cover anggota: tabel transparan dua kolom menjaga nama dan NIM tetap sejajar |
+| 2026-11-22 | Perbaikan DOCX hasil teks tempel: content type `rapimakalah/source.json` didaftarkan agar Microsoft Word tidak menganggap file rusak |
+| 2026-11-21 | Galeri template publik `/galeri`: terbitkan/tarik template kustom, pencarian dan filter kategori, salin ke akun |
 | 2026-11-15 | Berbagi template: kode 8 karakter, halaman publik `/t/<kode>` (noindex), impor salinan identik, cabut tautan |
 | 2026-11-14 | Admin panel (analitik + reset password) dan 8 halaman panduan SEO `/panduan` dengan JSON-LD Article |
 | 2026-11-13 | README lengkap, aksesibilitas kontras, heading landmark, backup script |
@@ -190,8 +197,9 @@ Database lokal (`server/prisma/dev.db`), `server/storage/`, `.env` privat, depen
 | Navigasi | Field TOC, preview struktural, outline halaman, penanda temuan |
 | Cover | Judul, jenis dokumen, mata kuliah, dosen, anggota + NIM, logo, institusi, departemen |
 | Isi | Sub-bab menggantung, label A/B/C, rumus LaTeX, daftar pustaka bertaut |
-| Template | 5 bawaan, kustom, duplikasi, editor konfigurasi, isian cover bawaan |
-| Akun | Registrasi, login, profil, ganti password, hapus akun |
+| Template | Template Makalah bawaan, template kustom, duplikasi, editor konfigurasi, isian cover bawaan |
+| Galeri | Terbitkan template kustom ke galeri publik `/galeri`, cari/filter, salin ke akun |
+| Akun | Registrasi/login email-password atau Google, profil, password lokal opsional, hapus akun dengan verifikasi |
 | Riwayat | Pencarian, filter status, pagination, unduh ulang, hapus dokumen |
 
 ## 2.2 Pemrosesan Dokumen
@@ -205,6 +213,8 @@ Validasi berlapis sebelum file diproses:
 3. Keberadaan `[Content_Types].xml` dan `word/document.xml`.
 4. Batas ukuran hasil ekstraksi (proteksi zip bomb).
 5. Batas ukuran upload `MAX_UPLOAD_MB` (default 20 MB).
+
+Isi DOCX baru diparse setelah ukuran dekompresi seluruh ZIP diverifikasi (maksimum 200 MB); entri yang ukurannya tidak dapat diverifikasi ditolak.
 
 File disimpan dengan nama UUID di `server/storage/<userId>/`. Nama asli hanya disimpan sebagai metadata.
 
@@ -268,6 +278,7 @@ Posisi nomor (bawah tengah / kanan) dan format bagian awal dapat diubah di panel
 - Heading dideteksi dari style (`Heading 1..N`), `w:outlineLvl`, dan pola teks seperti `BAB I`.
 - Penomoran BAB/sub-bab memakai `abstractNum` dan `numId` khusus agar tidak bertabrakan dengan penomoran pengguna.
 - Sub-bab memakai hanging indent dengan tab (default 1,25 cm atau 1,5 cm), badan paragraf sejajar dengan teks judul.
+- Daftar literal lama seperti `1.` pada DOCX dikonversi ke numbering Word asli; paragraf penjelas setelah item rata sejajar dengan teks item.
 - Label **A/B/C** di bawah sub-bab bukan heading: paragraf tebal `keepNext`, menjorok 425 twip dari sub-bab, dengan tab setelah huruf. Isi di bawahnya sejajar dengan teks label.
 
 ### 2.4.3 Daftar Isi
@@ -291,8 +302,12 @@ Posisi nomor (bawah tengah / kanan) dan format bagian awal dapat diubah di panel
 - Isian: jenis dokumen, judul, mata kuliah, dosen pengampu, anggota (nama + NIM), program studi, departemen, fakultas, universitas, tahun.
 - **Logo** diunggah atau ditempel dari clipboard, dengan slider ukuran. Rasio asli gambar dipertahankan sehingga logo tidak gepeng.
 - **Blok bawah** (program studi sampai tahun) ditempel di dasar halaman memakai frame, ukurannya sama dengan judul.
+- Preview hasil mengenali blok institusi berbingkai sebagai bagian cover dan menahannya di bawah halaman, termasuk pada DOCX dengan batas halaman sumber yang tidak biasa.
+- Baris tabel Markdown lama yang tersimpan sebagai paragraf dipulihkan menjadi tabel Word, termasuk bila paragraf kosong menyela baris-barisnya; tabel tampil sebagai tabel di preview.
 - `coverFit` menyusutkan jarak antar-baris otomatis supaya cover tetap satu halaman walau anggota bertambah.
 - Anggota bisa ditambah dan dihapus satu per satu.
+- Bila anggota lebih dari satu, nama dan NIM disusun dalam tabel dua kolom dengan **border transparan**. Kolom tetap sejajar saat anggota bertambah, tetapi tabel tidak terlihat sebagai tabel di Word.
+- Tabel cover lama yang masih bergaris (mis. tabel buatan pengguna dengan judul "Nama | NIM") ikut dirapikan: bordernya disembunyikan dan baris judulnya dibuang saat dokumen diformat ulang. Tabel isi makalah tidak disentuh.
 - Isian cover bawaan dapat disimpan di template; isian di workspace menimpa nilai template.
 
 ### 2.5.2 Kata Pengantar
@@ -309,10 +324,11 @@ Posisi nomor (bawah tengah / kanan) dan format bagian awal dapat diubah di panel
 
 ## 2.6 Template Pedoman
 
-- **Template bawaan yang ditampilkan: Makalah.** Laporan Praktikum, Proposal, Laporan PKL, dan Skripsi disembunyikan sementara dari daftar template dan pilihan workspace. Datanya tetap disimpan agar dokumen lama tetap dapat dibuka. Template kustom pengguna tetap tersedia. Bawaan bersifat read-only; duplikat dulu untuk mengedit.
+- **Template bawaan yang ditampilkan: Makalah.** Template bawaan lain yang lama tetap disimpan agar dokumen lama dapat dibuka; template kustom pengguna tetap tersedia. Template bawaan bersifat read-only; duplikat dahulu untuk mengedit.
 - **Template kustom** menyimpan seluruh konfigurasi: kertas, margin, typography, heading, penomoran, daftar isi, daftar pustaka, cover (ukuran judul/institusi, tampil/tidak departemen, logo, isian bawaan), caption.
 - **Editor template** memiliki preview konfigurasi dan validasi skema Zod di server.
 - **Berbagi template**: pemilik template kustom dapat membuat kode 8 karakter (tanpa `0/O/1/I/l`) dan membagikan tautan `/t/<kode>`. Halaman berbagi bersifat publik untuk dilihat (memuat ringkasan margin, font, heading, penomoran, daftar isi, serta nama pemilik), tetapi **tidak diindeks mesin pencari**. Penerima yang masuk/daftar dapat menekan “Simpan ke akun saya”; salinan dibuat dengan menyalin JSON konfigurasi apa adanya, jadi hasilnya identik, lalu menjadi milik penerima (bebas diubah tanpa memengaruhi aslinya). Nama yang bentrok otomatis menjadi `Nama (2)`. Pemilik dapat mencabut tautan kapan saja; tautan lama langsung 404.
+- **Galeri publik**: template kustom dapat diterbitkan lewat tombol globe di halaman Template, lalu muncul di `/galeri` dan dapat diindeks mesin pencari. Berbeda dari tautan berbagi, galeri bisa dicari dan difilter berdasarkan kategori tanpa perlu tautan. Pengguna yang login dapat menyimpan salinan (`POST /api/gallery/:id/use`); salinan independen dan tidak otomatis ikut terbit. Pemilik dapat menarik template dari galeri kapan saja. Status `isPublished` sengaja terpisah dari `shareId` agar template yang hanya dibagikan ke teman tidak otomatis tampil untuk umum. Template bawaan tidak dapat diterbitkan; duplikat dahulu. Template yang diterbitkan akun **admin** ditampilkan dengan nama **“Anonim”** di galeri dan halaman berbagi; institusi serta program studi tidak ikut ditampilkan.
 - Template lama yang belum memiliki bagian baru tetap valid karena semua field baru punya nilai default.
 
 Contoh konfigurasi:
@@ -332,15 +348,20 @@ Contoh konfigurasi:
 ## 2.7 Akun, Riwayat, Dashboard
 
 - Registrasi dan login memakai cookie httpOnly, bukan token di `localStorage`.
+- Login/pendaftaran Google opsional melalui Google Identity Services. Akun lokal yang sudah ada tidak otomatis ditautkan hanya karena alamat emailnya sama.
+- Akun Google dapat menambahkan password lokal dari Pengaturan; penghapusan akun perlu password atau verifikasi ulang Google.
 - Dashboard menampilkan jumlah dokumen, skor format terakhir, dokumen terbaru, aktivitas, dan template terpakai.
 - Riwayat mendukung pencarian, filter status, pagination, unduh ulang, dan hapus.
-- Pengaturan akun: ubah nama/institusi/prodi, ganti password, hapus akun beserta seluruh file.
+- Pengaturan akun: ubah nama/institusi/prodi, kelola password, hapus akun beserta seluruh file.
 
 ## 2.8 Keamanan dan Privasi
 
 - Password di-hash dengan bcrypt (cost 12).
 - JWT di cookie httpOnly; `COOKIE_SECURE=true` di produksi HTTPS.
+- `JWT_SECRET` harus diatur eksplisit, acak, dan minimal 32 karakter di produksi; server menolak nilai default atau placeholder.
 - Rate limit global 600 permintaan / 15 menit, plus limit terpisah untuk autentikasi.
+- Token Google diverifikasi server terhadap OAuth Client ID aplikasi; email harus terverifikasi.
+- Validasi DOCX menolak ZIP yang ukuran dekompresinya tidak bisa diverifikasi atau melebihi batas.
 - Semua endpoint dokumen dan template memeriksa kepemilikan pengguna.
 - Nama file penyimpanan UUID; path diverifikasi agar tidak keluar dari direktori pengguna.
 - Helmet, CORS terbatas pada `CLIENT_ORIGIN`, dan `X-Content-Type-Options: nosniff` pada unduhan.
@@ -352,6 +373,7 @@ Contoh konfigurasi:
 - Tidak ada konversi ke PDF dan tidak ada render identik dengan Word.
 - Pagination preview adalah estimasi; jumlah halaman final ditentukan Word.
 - Tabel kompleks (merge sel, text box, shape) ditampilkan sederhana di preview.
+- Tabel Markdown lama yang masih berupa paragraf dipulihkan bila pola header/pemisah/barisnya konsisten; paragraf kosong di antara baris juga didukung.
 - Heuristik cover dan batas bagian awal/isi bisa perlu penyesuaian pada struktur dokumen yang tidak umum.
 - Nomor halaman pada daftar isi bisa berbeda tipis dari Word; perbarui field bila perlu.
 
@@ -412,7 +434,9 @@ Set-ExecutionPolicy -Scope Process Bypass
    npm run db:setup
    ```
 
-   `db:setup` menjalankan `prisma db push` lalu seed lima template. Jangan gunakan pada database berisi data sebelum backup terverifikasi dan rencana perubahan schema diperiksa. `npm run setup` hanya memasang dependency.
+   `db:setup` menjalankan `prisma db push` lalu seed template bawaan. Jangan gunakan pada database berisi data sebelum backup terverifikasi dan rencana perubahan schema diperiksa. `npm run setup` hanya memasang dependency.
+
+   Login Google opsional. Untuk development, isi `GOOGLE_CLIENT_ID` pada `server/.env` dan daftarkan `http://localhost:5173` sebagai **Authorized JavaScript origin** di Google Cloud Console. Jika memakai database lama, backup dahulu dan tinjau perubahan schema (`googleSub`, password nullable) sebelum menjalankan `npm --prefix server run db:push`.
 
 5. **Jalankan aplikasi**
 
@@ -435,7 +459,8 @@ Berkas: `server/.env` (pengembangan) dan `server/.env.production` (produksi).
 | `PORT` | `4000` | Port API/Express. Produksi di proyek ini memakai `4001` |
 | `CLIENT_ORIGIN` | `http://localhost:5173` | Origin yang diizinkan CORS |
 | `CANONICAL_URL` | sama dengan `CLIENT_ORIGIN` | URL publik untuk canonical, Open Graph, JSON-LD (tidak boleh diakhiri `/`) |
-| `JWT_SECRET` | placeholder | **Wajib diganti** string acak panjang |
+| `JWT_SECRET` | placeholder | Wajib diganti; produksi menolak secret default/placeholder dan secret kurang dari 32 karakter |
+| `GOOGLE_CLIENT_ID` | kosong | Opsional; OAuth Client ID tipe Web application untuk login Google |
 | `DATABASE_URL` | `file:./dev.db` | SQLite lokal atau URL PostgreSQL |
 | `STORAGE_DIR` | `./storage` | Direktori file, relatif terhadap `server/` |
 | `MAX_UPLOAD_MB` | `20` | Batas ukuran upload |
@@ -677,12 +702,13 @@ Langkah sekali pakai:
 
 1. Buka URL situs Anda.
 2. Klik **Mulai gratis** → isi nama, email, password (minimal 8 karakter).
-3. Setelah akun dibuat, Anda langsung masuk ke dashboard.
-4. Lupa sesi? Buka **Masuk** dan login kembali.
+3. Jika Google Sign-In diaktifkan operator, Anda juga dapat mendaftar atau masuk dengan tombol Google.
+4. Setelah akun dibuat, Anda langsung masuk ke dashboard.
+5. Lupa sesi? Buka **Masuk** dan login kembali.
 
 ### 4.1.2 Dashboard
 
-Berisi ringkasan jumlah dokumen, skor format, dokumen terbaru, aktivitas terakhir, dan pintasan membuat dokumen baru. Menu samping: **Dashboard**, **Dokumen**, **Template**, **Pengaturan akun**.
+Berisi ringkasan jumlah dokumen, skor format, dokumen terbaru, aktivitas terakhir, dan pintasan membuat dokumen baru. Menu samping: **Dashboard**, **Dokumen**, **Template**, **Galeri template**, **Pengaturan akun**.
 
 ### 4.1.3 Membuat Dokumen Baru
 
@@ -706,7 +732,7 @@ Judul panjang otomatis turun baris, ukuran blok bawah tetap sama dengan judul, d
 
 ### 4.1.5 Memilih Template
 
-1. Di panel format, pilih template (Makalah, Laporan Praktikum, Proposal, Laporan PKL, Skripsi, atau template kustom Anda).
+1. Di panel format, pilih template Makalah atau salah satu template kustom Anda.
 2. Angka pada template menjadi acuan pemeriksaan: margin, font, spasi, indentasi, penomoran, daftar isi.
 3. Ingin pedoman kampus sendiri? Lihat [4.1.10](#4110-membuat-template-kustom).
 
@@ -949,6 +975,23 @@ Script membaca `server/test-fixture.docx`, menerapkan formatting, menulis hasil 
 
 File hasil bisa dibuka langsung di Microsoft Word untuk verifikasi manual.
 
+Uji regresi DOCX mencakup tabel Markdown legacy (juga saat antarbaris disela paragraf kosong), preview format/cover, numbering Word, dan tabel cover anggota:
+
+```powershell
+node server/scripts/test-text-tables.js
+node server/scripts/test-formatting-preview.js
+node server/scripts/test-list-indent.js
+node server/scripts/test-cover-members-table.js
+node server/scripts/test-cover-members.js
+node server/scripts/test-cover-table-existing.js
+```
+
+Untuk memastikan preview sebelum/sesudah format tetap konsisten, jalankan juga:
+
+```powershell
+node server/scripts/test-preview-format-parity.js
+```
+
 ## 6.2 Uji Alur Berbagi Template
 
 Jalankan hanya terhadap database pengembangan/tes yang tidak berisi data pengguna (jangan targetkan produksi). Server harus hidup (default `http://localhost:4001`). Script membuat dua akun uji sementara, lalu memverifikasi pembuatan kode, akses publik, impor salinan identik, penanganan nama bentrok, pencabutan tautan, dan `noindex`:
@@ -958,6 +1001,16 @@ node server/scripts/test-share.mjs
 ```
 
 Akun uji dihapus otomatis di akhir (kecuali dijalankan dengan `KEEP=1`). Untuk menunjuk server lain: `$env:BASE='http://localhost:4000'; node server/scripts/test-share.mjs`.
+
+## 6.2b Uji Galeri Template
+
+Jalankan hanya terhadap database pengembangan/tes yang tidak berisi data pengguna. Server harus hidup (default `http://localhost:4000`). Script membuat dua akun uji sementara, lalu memverifikasi penerbitan, daftar/detail publik, penolakan template bawaan, salin ke akun, pencabutan, dan metadata `/galeri`:
+
+```powershell
+node server/scripts/test-gallery.mjs
+```
+
+Akun uji dihapus otomatis di akhir (kecuali `KEEP=1`). Untuk menunjuk server lain: `$env:BASE='http://localhost:4001'; node server/scripts/test-gallery.mjs`.
 
 ## 6.3 Checklist Manual
 
@@ -972,6 +1025,7 @@ Akun uji dihapus otomatis di akhir (kecuali dijalankan dengan `KEEP=1`). Untuk m
 7. Reset hasil, lalu hapus dokumen.
 8. Bagikan template kustom: salin tautan `/t/<kode>`, buka di jendela privat, lalu impor dengan akun lain dan pastikan pengaturannya sama persis.
 9. Cabut tautan berbagi dan pastikan tautan lama menampilkan “Tautan template tidak tersedia”.
+10. Terbitkan template kustom, buka `/galeri` di jendela privat, lalu simpan salinannya dengan akun lain. Tarik template dari galeri dan pastikan salinan yang sudah tersimpan tetap ada.
 
 **Pemilik**
 
@@ -987,13 +1041,15 @@ Akun uji dihapus otomatis di akhir (kecuali dijalankan dengan `KEEP=1`). Untuk m
 
 | Method | Endpoint | Fungsi |
 | --- | --- | --- |
+| GET | `/api/auth/config` | Konfigurasi publik login Google |
 | POST | `/api/auth/register` | Registrasi + cookie sesi |
 | POST | `/api/auth/login` | Login |
+| POST | `/api/auth/google` | Verifikasi credential Google, lalu login/registrasi |
 | POST | `/api/auth/logout` | Hapus cookie sesi |
 | GET | `/api/auth/me` | Profil sesi aktif |
 | PATCH | `/api/auth/profile` | Update nama/institusi/prodi |
 | POST | `/api/auth/password` | Ubah password |
-| DELETE | `/api/account` | Hapus akun + seluruh file (perlu password) |
+| DELETE | `/api/account` | Hapus akun + seluruh file (perlu password atau verifikasi Google) |
 | GET | `/api/dashboard` | Statistik, dokumen terakhir, aktivitas |
 | GET | `/api/documents` | Daftar dokumen (search, status, pagination) |
 | POST | `/api/documents` | Upload DOCX (`multipart/form-data`, field `file`) |
@@ -1011,6 +1067,11 @@ Akun uji dihapus otomatis di akhir (kecuali dijalankan dengan `KEEP=1`). Untuk m
 | POST | `/api/templates/:id/duplicate` | Duplikasi template |
 | POST | `/api/templates/:id/share` | Buat/ambil kode berbagi template (auth, pemilik saja) |
 | DELETE | `/api/templates/:id/share` | Cabut tautan berbagi (auth, pemilik saja) |
+| POST | `/api/templates/:id/publish` | Terbitkan template ke galeri publik (auth, pemilik saja) |
+| DELETE | `/api/templates/:id/publish` | Tarik template dari galeri publik (auth, pemilik saja) |
+| GET | `/api/gallery` | Daftar template terbit, `?q=&category=` (publik) |
+| GET | `/api/gallery/:id` | Detail template galeri (publik) |
+| POST | `/api/gallery/:id/use` | Simpan salinan template galeri ke akun (auth) |
 | GET | `/api/share/:shareId` | Ringkasan template dibagikan (publik, tanpa auth) |
 | POST | `/api/share/:shareId/import` | Simpan salinan identik ke akun (auth) |
 | GET | `/api/admin/stats` | Statistik global (admin) |

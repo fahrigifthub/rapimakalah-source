@@ -38,6 +38,12 @@ export function AuthProvider({ children }) {
     return data.user;
   }, []);
 
+  const googleLogin = useCallback(async (credential) => {
+    const data = await api.post('/auth/google', { credential });
+    setUser(data.user);
+    return data.user;
+  }, []);
+
   const logout = useCallback(async () => {
     await api.post('/auth/logout').catch(() => null);
     setUser(null);
@@ -45,13 +51,13 @@ export function AuthProvider({ children }) {
 
   const updateProfile = useCallback(async (payload) => {
     const data = await api.patch('/auth/profile', payload);
-    setUser(data.user);
+    setUser((current) => ({ ...data.user, hasPassword: current?.hasPassword ?? data.user.hasPassword }));
     return data.user;
   }, []);
 
   const value = useMemo(
-    () => ({ user, loading, login, register, logout, updateProfile, setUser }),
-    [user, loading, login, register, logout, updateProfile],
+    () => ({ user, loading, login, register, googleLogin, logout, updateProfile, setUser }),
+    [user, loading, login, register, googleLogin, logout, updateProfile],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

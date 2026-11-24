@@ -9,10 +9,11 @@ export function PublicShell({ children }) {
     <div className="min-h-screen bg-white text-ink-900">
       <header className="sticky top-0 z-40 border-b border-line/80 bg-white/85 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-5">
-          <Link to="/" aria-label="RapiMakalah — beranda">
-            <Logo />
-          </Link>
+          <Logo />
           <nav className="flex items-center gap-2">
+            <Link to="/galeri" className="hidden rounded-lg px-3 py-1.5 text-[13px] font-medium text-ink-600 hover:bg-slate-50 hover:text-ink-900 sm:block">
+              Galeri
+            </Link>
             <Link to="/panduan" className="hidden rounded-lg px-3 py-1.5 text-[13px] font-medium text-ink-600 hover:bg-slate-50 hover:text-ink-900 sm:block">
               Panduan
             </Link>
@@ -44,6 +45,7 @@ export function PublicShell({ children }) {
           </div>
           <div className="flex flex-wrap items-center gap-5 text-[11px] text-ink-400">
             <Link to="/" className="hover:text-ink-700">Beranda</Link>
+            <Link to="/galeri" className="hover:text-ink-700">Galeri</Link>
             <Link to="/panduan" className="hover:text-ink-700">Panduan</Link>
             <Link to="/login" className="hover:text-ink-700">Masuk</Link>
             <span>© {new Date().getFullYear()} RapiMakalah</span>

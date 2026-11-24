@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowRight, Check, FileCheck2, LockKeyhole, Sparkles } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { Button } from '../components/ui/Button.jsx';
 import { Field, Input } from '../components/ui/Form.jsx';
 import { Logo } from '../components/ui/Common.jsx';
+import { safeNextPath } from '../lib/safeNext.js';
+import { GoogleSignIn } from '../components/GoogleSignIn.jsx';
 
 const FEATURES = [
   'Format DOCX asli, bukan rebuild dari HTML',
@@ -101,18 +103,40 @@ export function SubmitButton({ loading, children }) {
   );
 }
 
+export function GoogleAuthOption({ onCredential, onError, disabled, dividerLabel }) {
+  return (
+    <GoogleSignIn
+      onCredential={onCredential}
+      onError={onError}
+      disabled={disabled}
+      dividerLabel={dividerLabel}
+      className="mt-5"
+    />
+  );
+}
+
 export function useAuthForm() {
-  const { login } = useAuth();
+  const { login, googleLogin } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   // Kembali ke halaman asal (mis. tautan template yang dibagikan) bila ada.
-  const nextPath = (() => {
-    const next = params.get('next') || '';
-    return next.startsWith('/') && !next.startsWith('//') ? next : '/app';
-  })();
+  const nextPath = safeNextPath(params.get('next'), '/app');
+
+  const submitGoogle = useCallback(async (credential) => {
+    setError('');
+    setLoading(true);
+    try {
+      await googleLogin(credential);
+      navigate(nextPath);
+    } catch (err) {
+      setError(err.message || 'Gagal masuk dengan Google.');
+    } finally {
+      setLoading(false);
+    }
+  }, [googleLogin, navigate, nextPath]);
 
   const submitLogin = async (email, password) => {
     setError('');
@@ -127,5 +151,5 @@ export function useAuthForm() {
     }
   };
 
-  return { submitLogin, error, loading, setError };
+  return { submitLogin, submitGoogle, error, loading, setError };
 }

@@ -13,7 +13,8 @@ model User {
   id           String           @id @default(cuid())
   email        String           @unique
   name         String
-  passwordHash String
+  passwordHash String?
+  googleSub    String?          @unique(map: "User_googleSub_key")
   institution  String?
   programStudy String?
   createdAt    DateTime         @default(now())
@@ -35,6 +36,8 @@ model FormatTemplate {
   config      String // JSON-serialized TemplateConfig
   shareId     String?   @unique // kode berbagi publik; null = tidak dibagikan
   sharedAt    DateTime?
+  isPublished Boolean   @default(false)
+  publishedAt DateTime?
   importedFrom String? // kode berbagi asal, untuk jejak template impor
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -42,6 +45,7 @@ model FormatTemplate {
 
   @@index([ownerId])
   @@index([isSystem])
+  @@index([isPublished, publishedAt])
 }
 
 model Document {

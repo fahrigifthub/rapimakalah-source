@@ -124,6 +124,7 @@ export function parseParagraph(paragraphXml, blockIndex = null) {
     spaceBefore: spacingTag ? Number(getAttr(spacingTag, 'w:before') || 0) : null,
     spaceAfter: spacingTag ? Number(getAttr(spacingTag, 'w:after') || 0) : null,
     firstLineIndent: indTag ? Number(getAttr(indTag, 'w:firstLine') || getAttr(indTag, 'w:hanging') || 0) : null,
+    hasExplicitFirstLineIndent: Boolean(indTag && /\bw:firstLine\s*=/.test(indTag)),
     leftIndent: indTag ? Number(getAttr(indTag, 'w:left') || 0) : null,
     hangingIndent: indTag ? Number(getAttr(indTag, 'w:hanging') || 0) : null,
     hasNumbering: Boolean(numPr),

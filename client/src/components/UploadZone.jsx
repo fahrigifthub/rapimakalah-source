@@ -117,7 +117,7 @@ export function UploadZone({ onUploaded, compact = false, onError, className }) 
         />
         <div className="mt-2 flex items-center justify-between gap-3">
           <p className="text-[10px] leading-relaxed text-ink-400">
-            Judul diawali <code>#</code>, <code>##</code>; daftar diawali <code>1.</code> atau <code>-</code>; <code>---</code> jadi pemisah halaman.
+            Judul diawali <code>#</code>, <code>##</code>; daftar diawali <code>1.</code> atau <code>-</code>; tabel pakai <code>| kolom |</code>; <code>---</code> jadi pemisah halaman.
           </p>
           <Button onClick={submitText} disabled={sending || text.trim().length < 20} size="sm">
             {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}

@@ -186,9 +186,9 @@ function WorkspaceView({ id }) {
     setPreviewLoading(true);
     try {
       const [original, processed] = await Promise.all([
-        api.get(`/documents/${id}/preview?variant=original`).catch(() => null),
+        api.get(`/documents/${id}/preview?variant=original`, { cache: 'no-store' }).catch(() => null),
         doc?.processedAt
-          ? api.get(`/documents/${id}/preview?variant=processed`).catch(() => null)
+          ? api.get(`/documents/${id}/preview?variant=processed`, { cache: 'no-store' }).catch(() => null)
           : Promise.resolve(null),
       ]);
       setPreviews({
@@ -272,8 +272,8 @@ function WorkspaceView({ id }) {
         setLoading(false);
 
         const [originalPreview, processedPreview] = await Promise.all([
-          api.get(`/documents/${id}/preview?variant=original`).catch(() => null),
-          document.processedAt ? api.get(`/documents/${id}/preview?variant=processed`).catch(() => null) : Promise.resolve(null),
+          api.get(`/documents/${id}/preview?variant=original`, { cache: 'no-store' }).catch(() => null),
+          document.processedAt ? api.get(`/documents/${id}/preview?variant=processed`, { cache: 'no-store' }).catch(() => null) : Promise.resolve(null),
         ]);
         if (!active) return;
         setPreviews({ original: originalPreview?.preview || null, processed: processedPreview?.preview || null });
@@ -370,9 +370,9 @@ function WorkspaceView({ id }) {
     setTab('format');
     const response = await runAnalysis(nextConfig, templateId);
     if (response) {
-      const original = await api.get(`/documents/${id}/preview?variant=original`).catch(() => null);
-      const processed = doc?.processedAt
-        ? await api.get(`/documents/${id}/preview?variant=processed`).catch(() => null)
+       const original = await api.get(`/documents/${id}/preview?variant=original`, { cache: 'no-store' }).catch(() => null);
+       const processed = doc?.processedAt
+         ? await api.get(`/documents/${id}/preview?variant=processed`, { cache: 'no-store' }).catch(() => null)
         : null;
       setPreviews({ original: original?.preview || null, processed: processed?.preview || null });
       setPageIndex(0);
@@ -413,7 +413,7 @@ function WorkspaceView({ id }) {
       setPageIndex(0);
       setTab('check');
       setPreviewLoading(true);
-      const processed = await api.get(`/documents/${id}/preview?variant=processed`).catch(() => null);
+       const processed = await api.get(`/documents/${id}/preview?variant=processed`, { cache: 'no-store' }).catch(() => null);
       setPreviews((current) => ({ ...current, processed: processed?.preview || null }));
       setPreviewLoading(false);
       success('Dokumen berhasil dirapikan', {

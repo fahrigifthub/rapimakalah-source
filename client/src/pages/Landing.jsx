@@ -30,6 +30,7 @@ const NAV_LINKS = [
   { href: '#fitur', label: 'Fitur' },
   { href: '#cara-kerja', label: 'Cara kerja' },
   { href: '#keamanan', label: 'Keamanan' },
+  { href: '/galeri', label: 'Galeri' },
   { href: '/panduan', label: 'Panduan' },
 ];
 
@@ -368,14 +369,15 @@ export default function Landing() {
             <span className="text-[11px] text-ink-400">Academic document formatting platform</span>
           </div>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] text-ink-400">
+            <Link to="/galeri" className="hover:text-ink-700">Galeri</Link>
             <Link to="/panduan" className="hover:text-ink-700">Panduan</Link>
             <a
-              href="https://chat.whatsapp.com/L5teruZhe8NIdetR5fnVGX"
+              href="https://whatsapp.com/channel/0029VbD1zGq6mYPUbtVh6U0L"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-ink-700"
             >
-              Grup WhatsApp
+              Channel WhatsApp
             </a>
             <Link to="/login" className="hover:text-ink-700">Masuk</Link>
             <Link to="/register" className="hover:text-ink-700">Daftar</Link>

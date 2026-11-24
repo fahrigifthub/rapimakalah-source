@@ -1,6 +1,7 @@
 import JSZip from 'jszip';
 import { escapeXml } from './xml.js';
 import { latexToOmml, splitMath } from './omml.js';
+import { readTextTable, textTableXml } from './textTables.js';
 
 const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 const R_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
@@ -65,6 +66,26 @@ export function parseText(raw) {
       while (i + 1 < lines.length && lines[i + 1].trim() !== '$$') expression.push(lines[++i].trim());
       if (i + 1 < lines.length) i += 1;
       blocks.push({ type: 'p', text: `$$${expression.join(' ')}$$` });
+      continue;
+    }
+    // Headings can be preceded by Markdown bold markers (e.g. **BAB II**).
+    const normalizedHeadingLine = trimmed.replace(/^#{1,6}\s+/, '').replace(/\*\*/g, '').trim();
+    const sectionHeading = /^(?:KATA\s+PENGANTAR|DAFTAR\s+(?:ISI|PUSTAKA|TABEL|GAMBAR|LAMPIRAN)|ABSTRAK|BAB\s+[IVXL\d]+\b|(?:\d+(?:\.\d+)+)\.?\s+\S.+)$/i.test(normalizedHeadingLine);
+    if (sectionHeading && /^(?:#{1,6}\s+|\*\*|BAB\s|KATA\s|DAFTAR\s|ABSTRAK|\d)/i.test(trimmed)) {
+      flush();
+      const decimalHeading = /^(\d+(?:\.\d+)+)\.?\s/.exec(normalizedHeadingLine);
+      const level = /^(?:BAB\s|KATA\s|DAFTAR\s|ABSTRAK)/i.test(normalizedHeadingLine)
+        ? 1
+        : Math.min(decimalHeading[1].split('.').length, 3);
+      blocks.push({ type: 'h', level, text: normalizedHeadingLine });
+      continue;
+    }
+    // Tabel Markdown: header + baris pemisah "|---|" + baris isi.
+    const parsedTable = readTextTable(lines, i);
+    if (parsedTable) {
+      flush();
+      blocks.push({ type: 'table', ...parsedTable.table });
+      i = parsedTable.next - 1;
       continue;
     }
     if (/^(-{3,}|\*{3,}|_{3,}|={3,})$/.test(trimmed)) {
@@ -148,7 +169,7 @@ export function parseText(raw) {
     for (let k = 0; k < firstRule; k += 1) if (blocks[k].type === 'h') blocks[k] = { type: 'p', text: blocks[k].text };
   }
   // Title lines pasted straight above KATA PENGANTAR / DAFTAR ISI / BAB I are a cover: split them off.
-  const SECTION = /^(?:#+\s*)?(?:\*\*)?(KATA PENGANTAR|DAFTAR ISI|ABSTRAK|BAB\s+(?:I|1)\b|1\.?\s+PENDAHULUAN)/i;
+  const SECTION = /^(?:(?:#{1,6}\s*)|(?:\*\*)?)(KATA PENGANTAR|DAFTAR ISI|ABSTRAK|BAB\s+(?:I|1)\b|1\.?\s+PENDAHULUAN)/i;
   const first = blocks.findIndex((b) => b.type !== 'rule' && SECTION.test(b.text || ''));
   if (first > 0 && !blocks.slice(0, first).some((b) => b.type === 'rule')) blocks.splice(first, 0, { type: 'rule' });
   // A pasted contents list is not body content or a second set of headings.
@@ -167,6 +188,11 @@ function blocksToXml(blocks) {
   const out = [];
   const numberings = []; // ordered lists each restart at 1
   for (const b of blocks) {
+    if (b.type === 'table') {
+      lastWasOrdered = false;
+      out.push(textTableXml(b, { inlineRuns }));
+      continue;
+    }
     if (b.type === 'li' && b.ordered) {
       if (!lastWasOrdered) {
         numId += 1;
@@ -240,7 +266,7 @@ export async function buildDocxFromText(raw) {
   zip.file('rapimakalah/source.json', JSON.stringify({ type: 'pasted-text', version: 1 }));
   zip.file(
     '[Content_Types].xml',
-    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/><Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/></Types>',
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="json" ContentType="application/json"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/><Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/></Types>',
   );
   zip.file(
     '_rels/.rels',

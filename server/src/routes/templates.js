@@ -26,6 +26,8 @@ function serialize(template, usageCount = 0) {
     isSystem: template.isSystem,
     isOwned: Boolean(template.ownerId),
     shareId: template.shareId || null,
+    isPublished: template.isPublished || false,
+    publishedAt: template.publishedAt || null,
     importedFrom: template.importedFrom || null,
     config: normalizeTemplateConfig(JSON.parse(template.config)),
     usageCount,
@@ -162,6 +164,41 @@ templatesRouter.post(
       }
     }
     throw new HttpError(500, 'Gagal membuat kode berbagi. Coba lagi.');
+  }),
+);
+
+templatesRouter.post(
+  '/:id/publish',
+  asyncHandler(async (req, res) => {
+    const template = await prisma.formatTemplate.findUnique({ where: { id: req.params.id } });
+    if (!template) throw new HttpError(404, 'Template tidak ditemukan.');
+    if (template.isSystem) throw new HttpError(403, 'Template bawaan tidak dapat diterbitkan. Duplikat dahulu.');
+    if (template.ownerId !== req.user.id) throw new HttpError(403, 'Anda hanya dapat menerbitkan template milik sendiri.');
+    const updated = await prisma.formatTemplate.update({
+      where: { id: template.id },
+      data: { isPublished: true, publishedAt: template.publishedAt || new Date() },
+    });
+    await prisma.activity.create({
+      data: { userId: req.user.id, type: 'template', message: `Template “${template.name}” diterbitkan ke galeri publik` },
+    });
+    res.json({ template: serialize(updated) });
+  }),
+);
+
+templatesRouter.delete(
+  '/:id/publish',
+  asyncHandler(async (req, res) => {
+    const template = await prisma.formatTemplate.findUnique({ where: { id: req.params.id } });
+    if (!template) throw new HttpError(404, 'Template tidak ditemukan.');
+    if (template.ownerId !== req.user.id) throw new HttpError(403, 'Anda hanya dapat menarik template milik sendiri.');
+    const updated = await prisma.formatTemplate.update({
+      where: { id: template.id },
+      data: { isPublished: false, publishedAt: null },
+    });
+    await prisma.activity.create({
+      data: { userId: req.user.id, type: 'template', message: `Template “${template.name}” ditarik dari galeri publik` },
+    });
+    res.json({ template: serialize(updated) });
   }),
 );
 

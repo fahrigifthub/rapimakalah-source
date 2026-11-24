@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { X } from 'lucide-react';
 
-const GROUP_URL = 'https://chat.whatsapp.com/L5teruZhe8NIdetR5fnVGX';
-const STORAGE_KEY = 'rapimakalah:join-group:v1';
+const GROUP_URL = 'https://whatsapp.com/channel/0029VbD1zGq6mYPUbtVh6U0L';
+const STORAGE_KEY = 'rapimakalah:join-group:v2';
 const SHOW_DELAY_MS = 1500;
 const SNOOZE_DAYS = 14;
 
@@ -117,10 +117,10 @@ export default function JoinGroupPopup() {
           </span>
           <div className="pr-6">
             <h2 id="join-group-title" className="text-base font-semibold text-ink-900">
-              Info update di grup WhatsApp
+              Info update di channel WhatsApp
             </h2>
             <p id="join-group-desc" className="mt-1 text-sm leading-relaxed text-ink-500">
-              Dapatkan kabar fitur baru, tips format makalah, dan bantuan cepat dari pengguna lain.
+              Ikuti kabar fitur baru dan tips format makalah melalui channel WhatsApp RapiMakalah.
             </p>
           </div>
         </div>
@@ -137,7 +137,7 @@ export default function JoinGroupPopup() {
           className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] px-5 text-sm font-semibold text-white transition hover:bg-[#1EBE5A] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#25D366] focus-visible:ring-offset-2"
         >
           <WhatsappMark className="h-5 w-5" />
-          Gabung grup WhatsApp
+          Ikuti channel WhatsApp
         </a>
 
         <div className="mt-3 flex items-center justify-between gap-3">
@@ -158,7 +158,7 @@ export default function JoinGroupPopup() {
         </div>
 
         <p className="mt-4 border-t border-line pt-3 text-[11px] leading-relaxed text-ink-400">
-          Gratis, tanpa spam. Anda bisa keluar dari grup kapan saja.
+          Gratis. Anda bisa berhenti mengikuti channel kapan saja.
         </p>
       </div>
     </div>

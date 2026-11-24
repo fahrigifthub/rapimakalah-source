@@ -1,5 +1,6 @@
 ﻿import { escapeXml } from './xml.js';
 import { PAGE_DIMENSIONS_TWIPS } from './reader.js';
+import { buildCoverMembersTable } from './coverMembers.js';
 
 const MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
@@ -27,12 +28,14 @@ export function para(config, text, opts = {}) {
     pageBreakBefore = false,
     pageBreakAfter = false,
     keepNext = false,
+    keepLines = false,
     outline = null,
     frame = false,
   } = opts;
   const rPr = fontProps(config, { bold, size });
   const ppr =
     (keepNext ? '<w:keepNext/>' : '') +
+    (keepLines ? '<w:keepLines/>' : '') +
     (pageBreakBefore ? '<w:pageBreakBefore/>' : '') +
     (frame ? (typeof frame === 'string' ? frame : SIGNATURE_FRAME) : '') +
     `<w:spacing w:before="${before}" w:after="${after}" w:line="${line}" w:lineRule="auto"/>` +
@@ -113,8 +116,15 @@ export function buildCoverXml(config, meta = {}, { pageBreakAfter = true } = {})
   parts.push(para(config, 'Dosen Pengampu:', { ...c }));
   parts.push(para(config, ph(meta.lecturer, 'Nama dosen pengampu'), { ...c, after: meta.logoRid ? 0 : sp(360) }));
   parts.push(meta.logoRid ? logoPara(meta) : para(config, '[Tempel logo / foto di sini]', { ...c, before: sp(480), after: sp(480) }));
-  parts.push(para(config, 'Disusun oleh:', { ...c, after: sp(120) }));
-  memberLines.forEach(member => parts.push(para(config, member.nim ? `${member.name} (${member.nim})` : member.name, { ...c, bold: true })));
+  parts.push(para(config, 'Disusun oleh:', { ...c, after: sp(120), keepNext: memberLines.length > 0 }));
+  const useMemberTable = memberLines.some((member) => String(member.nim || '').trim());
+  if (useMemberTable) {
+    // Nama dan NIM dipisah ke dua kolom agar tetap sejajar, bahkan untuk satu
+    // anggota. Border tabel diset nil, jadi di Word hanya terlihat teks.
+    parts.push(buildCoverMembersTable(config, memberLines, { line: c.line, makeParagraph: para }));
+  } else {
+    memberLines.forEach(member => parts.push(para(config, member.name, { ...c, bold: true })));
+  }
   const inst = [
     ph(meta.program, 'PROGRAM STUDI').toUpperCase(),
     ...(cs.showDepartment && String(meta.department || '').trim() ? [String(meta.department).trim().toUpperCase()] : []),
@@ -126,7 +136,23 @@ export function buildCoverXml(config, meta = {}, { pageBreakAfter = true } = {})
   const pageW = config.page.orientation === 'landscape' ? page.height : page.width;
   const textW = pageW - Math.round(((config.page.margins.left + config.page.margins.right) / 2.54) * 1440);
   const frame = `<w:framePr w:w="${textW}" w:hSpace="0" w:wrap="notBeside" w:vAnchor="margin" w:hAnchor="margin" w:xAlign="center" w:yAlign="bottom"/>`;
-  inst.forEach((line, i) => parts.push(para(config, line, { ...c, bold: true, size: cs.institutionSize, ...(cs.institutionAtBottom ? { frame } : { before: i === 0 ? sp(480) : 0 }) })));
+  if (cs.institutionAtBottom) {
+    // One framed paragraph keeps the complete institution block at the bottom
+    // without stacking several independently bottom-anchored frames.
+    parts.push(
+      para(config, inst.join('\n'), {
+        ...c,
+        bold: true,
+        size: cs.institutionSize,
+        frame,
+        keepLines: true,
+      }),
+    );
+  } else {
+    inst.forEach((line, i) =>
+      parts.push(para(config, line, { ...c, bold: true, size: cs.institutionSize, before: i === 0 ? sp(480) : 0 })),
+    );
+  }
   if (pageBreakAfter) {
     parts.push('<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="20" w:lineRule="exact"/><w:rPr><w:sz w:val="2"/></w:rPr></w:pPr><w:r><w:rPr><w:sz w:val="2"/></w:rPr><w:br w:type="page"/></w:r></w:p>');
   }

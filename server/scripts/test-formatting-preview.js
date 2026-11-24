@@ -83,6 +83,19 @@ assert.deepEqual(noBreakBlocks.slice(0, 2).map(block => block.alignment), ['cent
 assert.ok(noBreakBlocks.slice(0, 2).every(block => block.isCover && !block.firstLineIndent && !block.leftIndent && !block.hangingIndent));
 assert.ok(noBreakBlocks.slice(2).every(block => !block.isCover), 'Cover detection stops at Kata Pengantar without requiring a page break');
 
+const detachedInstitution = build(
+  p(run('Cover title')) +
+  p(run('KATA PENGANTAR')) +
+  p(run('[PROGRAM STUDI]\n[FAKULTAS]\n[UNIVERSITAS]\n2026'), '<w:framePr w:yAlign="bottom"/>') +
+  p(run('BAB I PENDAHULUAN')),
+  new Map(),
+  { formatted: true, formatOptions: { cover: true } },
+);
+const institutionBlock = all(detachedInstitution).find(block => block.text.includes('[PROGRAM STUDI]'));
+assert.ok(institutionBlock?.bottomFrame, 'bottom-framed institution block is detected from uploaded DOCX');
+assert.equal(institutionBlock.isCover, true, 'bottom-framed institution block remains part of cover when source boundaries are inconsistent');
+assert.equal(institutionBlock.text, '[PROGRAM STUDI] [FAKULTAS] [UNIVERSITAS] 2026', 'institution labels remain legible in preview text');
+
 const tocOnlyFrontMatter = build(
   p(run('Cover title')) + p(run('Cover member')) + p(run('DAFTAR ISI')) + p(run('BAB I PENDAHULUAN')),
   new Map(),

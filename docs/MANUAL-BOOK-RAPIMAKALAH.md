@@ -73,7 +73,7 @@ Kritik dan saran dapat disampaikan kepada pengelola aplikasi agar manual ini ter
    - 3.13 Riwayat Dokumen
    - 3.14 Pustaka Template
    - 3.15 Membuat Template Kustom
-   - 3.16 Berbagi, Mengimpor, dan Mencabut Template
+   - 3.16 Berbagi, Menerbitkan, Mengimpor, dan Mencabut Template
    - 3.17 Workspace Menulis: Daftar Draft
    - 3.18 Workspace Menulis: Antarmuka Editor
    - 3.19 Workspace Menulis: Ribbon dan Perintah
@@ -259,6 +259,7 @@ Tabel 5. Peta halaman dan rute aplikasi
 | `/` | Publik | Halaman utama dan penjelasan produk |
 | `/panduan` | Publik | Indeks artikel panduan format |
 | `/panduan/<slug>` | Publik | Artikel panduan |
+| `/galeri` | Publik | Galeri template yang diterbitkan pengguna |
 | `/login` | Publik | Masuk ke akun |
 | `/register` | Publik | Membuat akun |
 | `/t/<shareId>` | Publik | Melihat template yang dibagikan |
@@ -828,7 +829,7 @@ Bagian **Data dokumen** dipakai untuk cover dan kata pengantar otomatis. Isian y
 
 Tambahan:
 
-1. **Anggota** — tambahkan nama dan NIM satu per satu; gunakan tombol tambah dan hapus.
+1. **Anggota** — tambahkan nama dan NIM satu per satu; gunakan tombol tambah dan hapus. Bila anggota lebih dari satu, nama dan NIM disusun dalam tabel dua kolom dengan border transparan agar tetap sejajar tanpa terlihat seperti tabel di Word.
 2. **Logo atau foto cover** — unggah dengan klik, seret ke area, atau tempel dengan `Ctrl+V`.
 3. **Ukuran logo** — atur tinggi logo antara 1 dan 8 cm melalui slider.
 
@@ -1099,7 +1100,7 @@ Fitur tambahan editor:
 
 Isian cover bawaan dipakai otomatis pada setiap dokumen yang memakai template. Isian yang diubah di workspace selalu menimpa nilai template.
 
-## 3.16 Berbagi, Mengimpor, dan Mencabut Template
+## 3.16 Berbagi, Menerbitkan, Mengimpor, dan Mencabut Template
 
 ### 3.16.1 Membagikan Template
 
@@ -1137,6 +1138,22 @@ Hasil impor:
 3. Pilih **Cabut tautan** dan konfirmasi.
 
 Setelah dicabut, tautan lama langsung tidak berlaku dan menampilkan pesan bahwa tautan tidak ditemukan atau sudah dicabut. Kode baru dapat dibuat kembali kapan saja.
+
+### 3.16.4 Menerbitkan ke Galeri Publik
+
+1. Buka **Template**.
+2. Pada template kustom, klik ikon **globe** untuk menerbitkan.
+3. Buka `/galeri` atau menu **Galeri template** untuk melihat hasilnya.
+4. Untuk menariknya, klik ikon globe yang sama pada template tersebut.
+
+Ketentuan:
+
+- Galeri dapat dicari dan difilter tanpa memerlukan tautan atau kode.
+- Template bawaan tidak dapat diterbitkan; duplikat dahulu menjadi template kustom.
+- Status galeri terpisah dari tautan berbagi. Mencabut tautan tidak otomatis menarik template dari galeri, dan sebaliknya.
+- Pengguna yang login dapat menyimpan salinan. Salinan tersebut independen dan tidak otomatis ikut terbit.
+- Menarik template hanya menghilangkan template asli dari galeri; salinan yang sudah disimpan pengguna lain tetap ada.
+- Bila yang menerbitkan adalah akun **admin**, nama yang tampil di galeri dan halaman berbagi menjadi **“Anonim”**, tanpa institusi atau program studi.
 
 ## 3.17 Workspace Menulis: Daftar Draft
 
@@ -1557,6 +1574,12 @@ $env:BASE='http://localhost:4000'; node server/scripts/test-share.mjs
 ```
 
 Akun uji dihapus otomatis di akhir, kecuali dijalankan dengan `KEEP=1`.
+
+Galeri template memiliki pengujian terpisah yang memverifikasi penerbitan, daftar/detail publik, penolakan template bawaan, salin ke akun, pencabutan, dan metadata `/galeri`:
+
+```powershell
+node server/scripts/test-gallery.mjs
+```
 
 ## 5.3 Checklist Pengguna
 

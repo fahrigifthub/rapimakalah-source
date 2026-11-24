@@ -22,6 +22,7 @@ import { Modal } from '../components/ui/Modal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { api } from '../lib/api.js';
+import { GoogleAuthOption } from './AuthShared.jsx';
 import { formatBytes, formatDate, initials } from '../lib/format.js';
 
 function PasswordInput({ value, onChange, placeholder, autoComplete }) {
@@ -49,7 +50,7 @@ function PasswordInput({ value, onChange, placeholder, autoComplete }) {
 }
 
 export default function Settings() {
-  const { user, updateProfile, logout } = useAuth();
+  const { user, updateProfile, logout, setUser } = useAuth();
   const { success, error } = useToast();
   const navigate = useNavigate();
 
@@ -68,6 +69,7 @@ export default function Settings() {
   const [stats, setStats] = useState(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
+  const [deleteCredential, setDeleteCredential] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
 
@@ -125,18 +127,19 @@ export default function Settings() {
       setPasswordError('Konfirmasi password baru tidak cocok.');
       return;
     }
-    if (passwords.newPassword === passwords.currentPassword) {
+    if (user?.hasPassword && passwords.newPassword === passwords.currentPassword) {
       setPasswordError('Password baru harus berbeda dari password saat ini.');
       return;
     }
     setSavingPassword(true);
     try {
-      await api.post('/auth/password', {
-        currentPassword: passwords.currentPassword,
+      const result = await api.post('/auth/password', {
+        ...(user?.hasPassword ? { currentPassword: passwords.currentPassword } : {}),
         newPassword: passwords.newPassword,
       });
-      success('Password diperbarui', { description: 'Gunakan password baru pada sesi berikutnya.' });
+      setUser((current) => ({ ...current, hasPassword: result.hasPassword, authProvider: result.authProvider }));
       setPasswords({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      success('Password diperbarui', { description: 'Password lokal dapat digunakan untuk masuk tanpa Google.' });
     } catch (err) {
       setPasswordError(err.message);
     } finally {
@@ -146,13 +149,15 @@ export default function Settings() {
 
   const handleDeleteAccount = async () => {
     setDeleteError('');
-    if (!deletePassword) {
+    if (user?.hasPassword && !deletePassword) {
       setDeleteError('Masukkan password untuk konfirmasi.');
       return;
     }
     setDeleting(true);
     try {
-      await api.delete('/account', { password: deletePassword });
+      await api.delete('/account', user?.hasPassword
+        ? { password: deletePassword }
+        : { credential: deleteCredential });
       await logout().catch(() => null);
       navigate('/', { replace: true });
     } catch (err) {
@@ -235,19 +240,21 @@ export default function Settings() {
                 <KeyRound className="h-4 w-4" />
               </span>
               <div>
-                <h2 className="text-[13px] font-semibold text-ink-900">Ubah password</h2>
-                <p className="text-[11px] text-ink-500">Minimal 8 karakter. Gunakan password yang tidak dipakai di layanan lain.</p>
+                <h2 className="text-[13px] font-semibold text-ink-900">{user?.hasPassword ? 'Ubah password' : 'Buat password lokal'}</h2>
+                <p className="text-[11px] text-ink-500">{user?.hasPassword ? 'Minimal 8 karakter. Gunakan password yang tidak dipakai di layanan lain.' : 'Akun Google Anda belum memiliki password lokal. Tambahkan agar bisa masuk dengan email dan password.'}</p>
               </div>
             </div>
             <form onSubmit={handlePassword} className="space-y-3.5 px-5 py-4">
-              <Field label="Password saat ini">
-                <PasswordInput
-                  value={passwords.currentPassword}
-                  onChange={(event) => setPasswords((current) => ({ ...current, currentPassword: event.target.value }))}
-                  autoComplete="current-password"
-                  placeholder="Masukkan password saat ini"
-                />
-              </Field>
+              {user?.hasPassword && (
+                <Field label="Password saat ini">
+                  <PasswordInput
+                    value={passwords.currentPassword}
+                    onChange={(event) => setPasswords((current) => ({ ...current, currentPassword: event.target.value }))}
+                    autoComplete="current-password"
+                    placeholder="Masukkan password saat ini"
+                  />
+                </Field>
+              )}
               <div className="grid gap-3.5 sm:grid-cols-2">
                 <Field label="Password baru" hint="Minimal 8 karakter.">
                   <PasswordInput
@@ -273,7 +280,7 @@ export default function Settings() {
                   size="sm"
                   icon={Lock}
                   loading={savingPassword}
-                  disabled={!passwords.currentPassword || !passwords.newPassword}
+                  disabled={user?.hasPassword ? (!passwords.currentPassword || !passwords.newPassword) : !passwords.newPassword}
                 >
                   Perbarui password
                 </Button>
@@ -356,7 +363,7 @@ export default function Settings() {
               <h2 className="text-[12px] font-semibold text-ink-900">Sesi</h2>
             </div>
             <p className="mt-2 text-[11px] leading-relaxed text-ink-500">
-              Keluar akan menghapus cookie sesi di browser ini. Untuk keluar dari perangkat lain, ubah password Anda.
+              Keluar akan menghapus cookie sesi di browser ini. Sesi Google lain dikelola dari Akun Google Anda.
             </p>
             <Button
               variant="secondary"
@@ -380,6 +387,7 @@ export default function Settings() {
           if (deleting) return;
           setDeleteOpen(false);
           setDeletePassword('');
+          setDeleteCredential('');
           setDeleteError('');
         }}
         title="Hapus akun secara permanen?"
@@ -392,13 +400,14 @@ export default function Settings() {
               onClick={() => {
                 setDeleteOpen(false);
                 setDeletePassword('');
+                setDeleteCredential('');
                 setDeleteError('');
               }}
               disabled={deleting}
             >
               Batal
             </Button>
-            <Button variant="danger" loading={deleting} icon={Trash2} onClick={handleDeleteAccount}>
+            <Button variant="danger" loading={deleting} icon={Trash2} onClick={handleDeleteAccount} disabled={user?.hasPassword ? !deletePassword : !deleteCredential}>
               Hapus akun saya
             </Button>
           </>
@@ -406,16 +415,31 @@ export default function Settings() {
       >
         <div className="space-y-3">
           <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-[11px] leading-relaxed text-red-700">
-            Tindakan ini tidak dapat dibatalkan. Masukkan password akun Anda untuk melanjutkan.
+            Tindakan ini tidak dapat dibatalkan. {user?.hasPassword ? 'Masukkan password akun Anda untuk melanjutkan.' : 'Verifikasi lagi dengan Google untuk menghapus akun.'}
           </div>
-          <Field label="Password">
-            <PasswordInput
-              value={deletePassword}
-              onChange={(event) => setDeletePassword(event.target.value)}
-              autoComplete="current-password"
-              placeholder="Password akun"
+          {user?.hasPassword ? (
+            <Field label="Password">
+              <PasswordInput
+                value={deletePassword}
+                onChange={(event) => setDeletePassword(event.target.value)}
+                autoComplete="current-password"
+                placeholder="Password akun"
+              />
+            </Field>
+          ) : (
+            <GoogleAuthOption
+              onCredential={(credential) => {
+                setDeleteCredential(credential);
+                setDeleteError('');
+              }}
+              onError={(message) => {
+                setDeleteCredential('');
+                setDeleteError(message);
+              }}
+              disabled={deleting}
+              dividerLabel="atau verifikasi dengan"
             />
-          </Field>
+          )}
           {deleteError && <p className="text-[12px] text-red-600">{deleteError}</p>}
         </div>
       </Modal>

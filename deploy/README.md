@@ -13,6 +13,8 @@ Untuk Cloudflare Tunnel:
 3. Isi tunnel ID, lokasi file kredensial, hostname, dan target service. File konfigurasi aktual di-ignore Git.
 4. Buat record DNS hostname tersebut lewat dashboard Cloudflare.
 5. Salin `env.production.example` ke `server/.env.production`, lalu isi secret dan konfigurasi sesuai server. Jangan commit file hasil salinan.
+6. Untuk mengaktifkan Google Sign-In, buat OAuth Client ID bertipe **Web application** di Google Cloud Console. Tambahkan origin publik aplikasi (mis. `https://domain-anda.example`) ke **Authorized JavaScript origins**, lalu isi `GOOGLE_CLIENT_ID` pada `server/.env.production`. Client ID bukan secret; endpoint `/api/auth/config` menyediakannya ke browser. Tanpa nilai ini, login Google tidak aktif.
+7. Setelah backup database, jalankan `npm --prefix server run db:push` untuk menambahkan `googleSub` dan membuat `passwordHash` nullable. Periksa target `DATABASE_URL` sebelum menjalankan; perintah ini tidak dijalankan otomatis.
 
 Jalankan dari root proyek:
 

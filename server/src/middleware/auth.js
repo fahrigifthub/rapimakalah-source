@@ -37,13 +37,28 @@ export async function authenticate(req, res, next) {
     }
     const user = await prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { id: true, email: true, name: true, institution: true, programStudy: true, createdAt: true, role: true },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        institution: true,
+        programStudy: true,
+        createdAt: true,
+        role: true,
+        passwordHash: true,
+        googleSub: true,
+      },
     });
     if (!user) {
       clearAuthCookie(res);
       return res.status(401).json({ error: 'Akun tidak ditemukan.' });
     }
-    req.user = user;
+    const { passwordHash, googleSub, ...publicUser } = user;
+    req.user = {
+      ...publicUser,
+      hasPassword: Boolean(passwordHash),
+      authProvider: googleSub ? (passwordHash ? 'google+password' : 'google') : 'password',
+    };
     next();
   } catch (error) {
     next(error);

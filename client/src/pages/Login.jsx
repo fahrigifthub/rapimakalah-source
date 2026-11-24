@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { AlertCircle } from 'lucide-react';
-import { AuthFooter, AuthLayout, PasswordField, SubmitButton, useAuthForm } from './AuthShared.jsx';
+import { AuthFooter, AuthLayout, GoogleAuthOption, PasswordField, SubmitButton, useAuthForm } from './AuthShared.jsx';
 import { Field, Input } from '../components/ui/Form.jsx';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { submitLogin, error, loading } = useAuthForm();
+  const { submitLogin, submitGoogle, error, loading, setError } = useAuthForm();
+
+  const handleGoogleError = useCallback((message) => setError(message), [setError]);
 
   const onSubmit = (event) => {
     event.preventDefault();
@@ -45,6 +47,7 @@ export default function Login() {
           Sesi disimpan sebagai cookie httpOnly. RapiMakalah tidak menyimpan password dalam bentuk teks.
         </p>
       </form>
+      <GoogleAuthOption onCredential={submitGoogle} onError={handleGoogleError} disabled={loading} />
       <AuthFooter prompt="Belum punya akun?" to="/register" label="Daftar gratis" />
     </AuthLayout>
   );

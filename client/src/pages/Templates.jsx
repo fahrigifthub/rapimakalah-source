@@ -7,6 +7,7 @@ import {
   Check,
   Copy,
   FileDown,
+  Globe,
   Layers,
   LayoutTemplate,
   Link2,
@@ -35,13 +36,14 @@ const FILTERS = [
   { key: 'custom', label: 'Template saya' },
 ];
 
-function TemplateCard({ template, onUse, onEdit, onDuplicate, onDelete, onShare, duplicating }) {
+function TemplateCard({ template, onUse, onEdit, onDuplicate, onDelete, onShare, onPublish, duplicating, publishing }) {
   const summary = configSummary(template.config);
   return (
     <article className="surface-card flex flex-col overflow-hidden transition hover:shadow-pop">
       <div className="relative border-b border-line bg-gradient-to-b from-slate-50/80 to-white p-3">
         <div className="absolute left-3 top-3 z-10 flex gap-1.5">
           <Badge tone={template.isSystem ? 'blue' : 'green'}>{template.isSystem ? 'Bawaan' : 'Kustom'}</Badge>
+          {template.isPublished && <Badge tone="amber">Publik</Badge>}
         </div>
         <TemplatePreview config={template.config} className="h-[176px] border-0 bg-transparent p-0" />
       </div>
@@ -93,6 +95,14 @@ function TemplateCard({ template, onUse, onEdit, onDuplicate, onDelete, onShare,
               >
                 <Share2 className="h-3.5 w-3.5" />
               </IconButton>
+              <IconButton
+                label={template.isPublished ? 'Tarik dari galeri publik' : 'Terbitkan ke galeri publik'}
+                onClick={() => onPublish(template)}
+                disabled={publishing}
+                className={cx('border-line', template.isPublished && 'text-amber-600')}
+              >
+                <Globe className={cx('h-3.5 w-3.5', publishing && 'animate-pulse')} />
+              </IconButton>
               <IconButton label="Edit template" onClick={() => onEdit(template)} className="border-line">
                 <Pencil className="h-3.5 w-3.5" />
               </IconButton>
@@ -127,6 +137,7 @@ export default function Templates() {
   const [filter, setFilter] = useState('all');
   const [query, setQuery] = useState('');
   const [duplicatingId, setDuplicatingId] = useState(null);
+  const [publishingId, setPublishingId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [shareTarget, setShareTarget] = useState(null);
@@ -184,6 +195,25 @@ export default function Templates() {
       error(err.message);
     } finally {
       setDuplicatingId(null);
+    }
+  };
+
+  const togglePublish = async (template) => {
+    setPublishingId(template.id);
+    try {
+      if (template.isPublished) {
+        await api.delete(`/templates/${template.id}/publish`);
+        setTemplates((items) => items.map((item) => (item.id === template.id ? { ...item, isPublished: false, publishedAt: null } : item)));
+        success('Ditarik dari galeri', { description: `“${template.name}” tidak lagi tampil di galeri publik.` });
+      } else {
+        const payload = await api.post(`/templates/${template.id}/publish`);
+        setTemplates((items) => items.map((item) => (item.id === template.id ? { ...item, isPublished: payload.template.isPublished, publishedAt: payload.template.publishedAt } : item)));
+        success('Diterbitkan ke galeri', { description: `“${template.name}” sekarang bisa ditemukan pengguna lain.` });
+      }
+    } catch (err) {
+      error(err.message);
+    } finally {
+      setPublishingId(null);
     }
   };
 
@@ -282,6 +312,9 @@ export default function Templates() {
         description="Template menyimpan margin, tipografi, heading, penomoran halaman, dan daftar isi. Template bawaan bisa diduplikasi, lalu disesuaikan dengan pedoman kampus Anda."
         actions={
           <>
+            <Button variant="secondary" icon={Globe} onClick={() => navigate('/galeri')}>
+              Galeri publik
+            </Button>
             <Button variant="secondary" icon={FileDown} onClick={() => setImportOpen(true)}>
               Impor template
             </Button>
@@ -329,6 +362,8 @@ export default function Templates() {
         <p className="text-[11px] leading-relaxed text-ink-500">
           Template bawaan disediakan sebagai titik awal berdasarkan pedoman kampus yang umum — bukan klaim bahwa
           setiap institusi memakai angka yang sama. Periksa pedoman resmi Anda dan sesuaikan pada template kustom.
+          Tombol <Globe className="inline h-3 w-3 align-[-2px]" /> menerbitkan template kustom ke galeri publik;
+          tarik kembali kapan saja.
         </p>
       </div>
 
@@ -347,7 +382,9 @@ export default function Templates() {
               onDuplicate={handleDuplicate}
               onDelete={setDeleteTarget}
               onShare={openShare}
+              onPublish={togglePublish}
               duplicating={duplicatingId === template.id}
+              publishing={publishingId === template.id}
             />
           ))}
         </div>

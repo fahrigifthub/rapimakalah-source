@@ -9,8 +9,11 @@ import { readDocxBuffer } from '../src/docx/reader.js';
 const config = structuredClone(DEFAULT_TEMPLATE_CONFIG);
 const members = [{ name: 'Anggota Satu', nim: '0000001' }, { name: 'Anggota Dua', nim: '0000002' }];
 const xml = buildCoverXml(config, { members, department: '' });
-assert.doesNotMatch(xml, /<w:tbl>/);
-assert.match(xml, /Anggota Satu \(0000001\)/);
+assert.match(xml, /<w:tbl>/);
+assert.match(xml, /RapiMakalah Cover Members/);
+assert.match(xml, /<w:tblBorders><w:top w:val="nil"\/><w:left w:val="nil"\/><w:bottom w:val="nil"\/><w:right w:val="nil"\/><w:insideH w:val="nil"\/><w:insideV w:val="nil"\/><\/w:tblBorders>/);
+assert.match(xml, /Anggota Satu/);
+assert.match(xml, /0000001/);
 assert.doesNotMatch(xml, /\[DEPARTEMEN\]/);
 assert.match(buildCoverXml(config, { members, department: 'Departemen Teknik' }), /DEPARTEMEN TEKNIK/);
 config.cover.defaults = { department: 'Departemen Bawaan', members };
@@ -22,6 +25,9 @@ const output = await zip.file('word/document.xml').async('string');
 assert.doesNotMatch(output, /Departemen Bawaan|DEPARTEMEN BAWAAN/);
 const preview = await createPreview(result.buffer, config, 'processed', options);
 const blocks = preview.pages.flatMap(p => p.blocks);
-assert.ok(!blocks.some(b => b.isMemberTable));
-for (const member of members) assert.ok(blocks.some(b => b.text === `${member.name} (${member.nim})` && b.alignment === 'center'));
+const memberTable = blocks.find(b => b.isMemberTable);
+assert.ok(memberTable, 'preview memakai tabel anggota');
+for (const member of members) {
+  assert.ok(memberTable.rows.some(row => row[0]?.text === member.name && row[1]?.text === member.nim), `preview memuat ${member.name} dan ${member.nim}`);
+}
 console.log('PASS: Cover members use centered text with NIM and department remains optional.');

@@ -15,6 +15,7 @@ import AdminPage from './pages/Admin.jsx';
 import Guides from './pages/Guides.jsx';
 import GuideArticle from './pages/GuideArticle.jsx';
 import SharedTemplate from './pages/SharedTemplate.jsx';
+import Gallery from './pages/Gallery.jsx';
 import NotFound from './pages/NotFound.jsx';
 import JoinGroupPopup from './components/JoinGroupPopup.jsx';
 
@@ -72,6 +73,7 @@ export default function App() {
         <Route path="/register" element={<PublicOnly><Register /></PublicOnly>} />
         <Route path="/panduan" element={<Guides />} />
         <Route path="/panduan/:slug" element={<GuideArticle />} />
+        <Route path="/galeri" element={<Gallery />} />
         <Route path="/t/:shareId" element={<SharedTemplate />} />
         <Route path="/app" element={<Protected><Dashboard /></Protected>} />
         <Route path="/app/writing" element={<WritingRoute />} />

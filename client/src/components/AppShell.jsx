@@ -5,6 +5,7 @@ import {
   ChevronRight,
   FilePlus2,
   FileText,
+  Globe,
   PenLine,
   LayoutDashboard,
   LayoutTemplate,
@@ -23,6 +24,7 @@ const NAV = [
   { to: '/app/documents', label: 'Dokumen', icon: FileText },
   { to: '/app/writing', label: 'Menulis', icon: PenLine },
   { to: '/app/templates', label: 'Template', icon: LayoutTemplate },
+  { to: '/galeri', label: 'Galeri template', icon: Globe },
   { to: '/app/settings', label: 'Pengaturan', icon: Settings },
 ];
 

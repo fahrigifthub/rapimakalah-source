@@ -164,6 +164,9 @@ documentsRouter.get(
 documentsRouter.get(
   '/:id/preview',
   asyncHandler(async (req, res) => {
+    // A processed preview changes in place each time the user applies
+    // formatting. Never let the browser reuse a response for the stable URL.
+    res.set('Cache-Control', 'private, no-store');
     const doc = await getOwnedDocument(req);
     const variant = req.query.variant === 'processed' ? 'processed' : 'original';
     if (variant === 'processed' && !doc.processedName) {

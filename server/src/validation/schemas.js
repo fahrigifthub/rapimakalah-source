@@ -118,7 +118,7 @@ export const updateProfileSchema = z.object({
 });
 
 export const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1),
+  currentPassword: z.string().optional(),
   newPassword: z.string().min(8, 'Password baru minimal 8 karakter').max(128),
 });
 

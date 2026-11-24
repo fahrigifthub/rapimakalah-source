@@ -28,6 +28,15 @@ const PAGES = {
     robots: 'index,follow',
     type: 'website',
   },
+  '/galeri': {
+    title: 'Galeri Template Makalah — RapiMakalah',
+    description:
+      'Jelajahi template format makalah dan skripsi yang dibagikan komunitas RapiMakalah. Lihat pengaturan margin, font, heading, dan penomoran halaman, lalu simpan salinannya ke akun Anda.',
+    keywords:
+      'galeri template makalah, template format skripsi, template word mahasiswa, format makalah kampus, bagi template',
+    robots: 'index,follow,max-image-preview:large',
+    type: 'website',
+  },
   '/panduan': {
     title: GUIDE_INDEX.title,
     description: GUIDE_INDEX.description,

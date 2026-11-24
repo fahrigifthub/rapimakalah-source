@@ -13,6 +13,7 @@ import { dashboardRouter } from './routes/dashboard.js';
 import { accountRouter } from './routes/account.js';
 import { adminRouter } from './routes/admin.js';
 import { shareRouter } from './routes/share.js';
+import { galleryRouter } from './routes/gallery.js';
 import { writingRouter } from './routes/writing.js';
 import { errorHandler, notFound } from './middleware/error.js';
 import { injectSeo, robotsHeaderFor } from './seo.js';
@@ -23,6 +24,7 @@ export function createApp() {
   app.disable('x-powered-by');
   app.use(
     helmet({
+      crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
       crossOriginResourcePolicy: { policy: 'same-site' },
       contentSecurityPolicy: false,
     }),
@@ -65,6 +67,7 @@ export function createApp() {
   app.use('/api/documents', documentsRouter);
   app.use('/api/templates', templatesRouter);
   app.use('/api/share', shareRouter);
+  app.use('/api/gallery', galleryRouter);
   app.use('/api/writing', writingRouter);
   app.use('/api/dashboard', dashboardRouter);
   app.use('/api/admin', adminRouter);
@@ -94,7 +97,7 @@ export function createApp() {
       if (req.path.startsWith('/api')) return next();
       const robots = robotsHeaderFor(req.path);
       if (robots) res.set('X-Robots-Tag', robots);
-      res.set('Cache-Control', robots ? 'no-store' : 'public, max-age=300');
+      res.set('Cache-Control', robots ? 'no-store' : 'no-cache');
       res.type('html').send(pageHtml(req.path));
     });
   }

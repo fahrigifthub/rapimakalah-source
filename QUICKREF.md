@@ -124,6 +124,7 @@ Compress-Archive -Path server\prisma\dev.db, server\storage -DestinationPath "ba
 | `/app` | Workspace utama (noindex) |
 | `/app/documents` | Riwayat dokumen |
 | `/app/templates` | Kelola template |
+| `/galeri` | Galeri template publik |
 | `/app/writing` | Daftar draft workspace menulis |
 | `/app/writing/<id>` | Editor makalah manual dan ekspor DOCX |
 | `/app/admin` | Admin panel (khusus admin) |

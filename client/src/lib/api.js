@@ -14,13 +14,14 @@ export function onUnauthorized(handler) {
   unauthorizedHandler = handler;
 }
 
-async function request(path, { method = 'GET', body, headers, signal } = {}) {
+async function request(path, { method = 'GET', body, headers, signal, cache } = {}) {
   const options = {
     method,
     credentials: 'include',
     headers: { ...(headers || {}) },
     signal,
   };
+  if (cache) options.cache = cache;
   if (body instanceof FormData) {
     options.body = body;
   } else if (body !== undefined) {
