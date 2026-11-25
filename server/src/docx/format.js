@@ -5,6 +5,7 @@ import {
   getAttr,
   getInner,
   removeChild,
+  scanChildren,
   setParagraphProperty,
   setRunProperty,
   textParagraph,
@@ -84,6 +85,57 @@ function normalizeCoverTable(xml) {
     // paragraf atau style sumbernya mewarisi format tebal.
     return normalized.replace(/<w:b(?:Cs)?\b[^>]*\/?\s*>/g, '<w:b w:val="0"/>');
   });
+}
+
+/** Center a table object without changing the alignment of text in its cells. */
+function normalizeTableAlignment(tableXml) {
+  const tablePr = getInner(tableXml, 'w:tblPr');
+  if (!tablePr) {
+    const openEnd = tableXml.indexOf('>') + 1;
+    if (openEnd <= 0) return tableXml;
+    return `${tableXml.slice(0, openEnd)}<w:tblPr><w:jc w:val="center"/></w:tblPr>${tableXml.slice(openEnd)}`;
+  }
+  const nextPr = upsertChild(
+    tablePr.inner,
+    'w:jc',
+    '<w:jc w:val="center"/>',
+    ['w:tblStyle', 'w:tblpPr', 'w:tblOverlap', 'w:bidiVisual', 'w:tblStyleRowBandSize', 'w:tblStyleColBandSize', 'w:tblW', 'w:jc', 'w:tblCellSpacing', 'w:tblInd', 'w:tblBorders', 'w:shd', 'w:tblLayout', 'w:tblCellMar', 'w:tblLook', 'w:tblCaption', 'w:tblDescription', 'w:tblPrChange'],
+  );
+  return tableXml.slice(0, tablePr.range.openEnd) + nextPr + tableXml.slice(tablePr.range.closeStart);
+}
+
+function centerFloatingImages(paragraphXml) {
+  return paragraphXml.replace(/<wp:positionH\b([^>]*)>([\s\S]*?)<\/wp:positionH>/g, (_match, attrs, inner) => {
+    const centered = inner.includes('<wp:align>')
+      ? inner.replace(/<wp:align>[^<]*<\/wp:align>/, '<wp:align>center</wp:align>')
+      : inner.replace(/<wp:posOffset>[^<]*<\/wp:posOffset>/, '<wp:align>center</wp:align>');
+    return `<wp:positionH${attrs}>${centered}</wp:positionH>`;
+  });
+}
+
+function normalizeBodyObjects(documentXml) {
+  const structure = getBodyStructure(documentXml);
+  const edits = [];
+  for (const block of structure.blocks) {
+    if (block.type === 'w:tbl') {
+      const xml = normalizeTableAlignment(block.xml);
+      if (xml !== block.xml) edits.push({ block, xml });
+      continue;
+    }
+    if (block.type !== 'w:p' || !block.data) continue;
+    const isCaption = /^\s*(?:gambar|figure|tabel|table)\s+[\dIVXL]+(?:[.:\s]|$)/i.test(block.data.plainText);
+    if (!block.data.hasImage && !isCaption) continue;
+    let xml = setParagraphProperty(block.xml, 'w:jc', '<w:jc w:val="center"/>');
+    xml = setIndent(xml, 0);
+    if (block.data.hasImage) xml = centerFloatingImages(xml);
+    if (xml !== block.xml) edits.push({ block, xml });
+  }
+  if (!edits.length) return documentXml;
+  let inner = structure.bodyInner;
+  for (const { block, xml } of edits.sort((a, b) => b.block.start - a.block.start)) {
+    inner = inner.slice(0, block.start) + xml + inner.slice(block.end);
+  }
+  return documentXml.slice(0, structure.bodyRange.openEnd) + inner + documentXml.slice(structure.bodyRange.closeStart);
 }
 
 const INSTITUTION_ANCHOR = /PROGRAM\s+STUDI|FAKULTAS|UNIVERSITAS/i;
@@ -944,7 +996,19 @@ export async function formatDocument(inputBuffer, { config, options = {}, bounda
       edits.push({ block, xml });
       continue;
     }
-    if (options.alignment) {
+    const isFigureParagraph = block.data.hasImage;
+    const hasFigureCaption = /^\s*(?:gambar|figure)\s+[\dIVXL]+(?:[.:\s]|$)/i.test(block.data.plainText);
+    const hasTableCaption = /^\s*(?:tabel|table)\s+[\dIVXL]+(?:[.:\s]|$)/i.test(block.data.plainText);
+    if (isFigureParagraph || hasFigureCaption || hasTableCaption) {
+      // Keep figures and their captions centered; table captions also stay
+      // centered without changing ordinary body paragraphs mentioning tables.
+      xml = setParagraphProperty(xml, 'w:jc', '<w:jc w:val="center"/>');
+      xml = setIndent(xml, 0);
+      if (isFigureParagraph) {
+        listContinuationIndent = null;
+        xml = centerFloatingImages(xml);
+      }
+    } else if (options.alignment) {
       // A justified line ending in a manual break (Shift+Enter) gets stretched
       // across the page; such paragraphs stay left-aligned instead.
       const align = bodyAlignment(block.xml, typography.alignment);
@@ -953,12 +1017,21 @@ export async function formatDocument(inputBuffer, { config, options = {}, bounda
     if (block.data.hasNumbering) {
       xml = applyNumberedListIndent(xml);
       listContinuationIndent = numberedListTextIndent(block.data.ilvl || 0);
+    } else if ((hasFigureCaption || hasTableCaption) && block.data.plainText.trim()) {
+      // Standalone captions should not inherit hanging indents from nearby lists.
+      listContinuationIndent = null;
+      if (options.firstLineIndent) xml = setIndent(xml, 0);
     } else if (listContinuationIndent !== null && block.data.plainText.trim()) {
       xml = applyListContinuationIndent(xml, listContinuationIndent);
     } else if (options.firstLineIndent && block.data.plainText) {
       xml = setIndent(xml, typography.firstLineIndent, bodyLeft);
     } else if (options.firstLineIndent) {
       xml = setIndent(xml, 0);
+    }
+    if (isFigureParagraph || hasFigureCaption || hasTableCaption) {
+      // Reassert after generic list/body indentation rules.
+      xml = setIndent(xml, 0);
+      listContinuationIndent = null;
     }
     xml = mergeParagraphSpacing(xml, {
       lineSpacing: typography.lineSpacing,
@@ -992,6 +1065,14 @@ export async function formatDocument(inputBuffer, { config, options = {}, bounda
     bodyInner = formattedTablesXml;
     operationLog.push('Spasi tabel teks diselaraskan dengan template');
   }
+
+  // Reassert object/caption placement after all paragraph and table formatting.
+  // This final pass matters because the table-font and spacing passes also
+  // rewrite cell XML, and keeps user cell-text alignment intact.
+  const formattedBodyXml = documentXml.slice(0, bodyStartPos) + bodyInner + documentXml.slice(bodyEndPos);
+  const normalizedBodyXml = normalizeBodyObjects(formattedBodyXml);
+  bodyInner = getInner(normalizedBodyXml, 'w:body')?.inner ?? bodyInner;
+  operationLog.push('Gambar, caption, dan objek tabel dipusatkan');
 
   // Font & size inside tables (content text runs only).
   if (options.font || options.fontSize) {

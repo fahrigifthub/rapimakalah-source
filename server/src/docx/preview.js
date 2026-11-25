@@ -79,6 +79,8 @@ function imageSizes(blockXml) {
 }
 
 function tableForPreview(tableXml, images) {
+  const tablePr = tableXml.match(/<w:tblPr\b[^>]*>([\s\S]*?)<\/w:tblPr>/)?.[1] || '';
+  const tableAlign = /<w:jc\b[^>]*w:val="([a-z]+)"/.exec(tablePr)?.[1] || null;
   const rows = [];
   let headerRows = 0;
   const rowRe = /<w:tr\b[^>]*>([\s\S]*?)<\/w:tr>/g;
@@ -90,13 +92,16 @@ function tableForPreview(tableXml, images) {
     let cellMatch;
     while ((cellMatch = cellRe.exec(rowMatch[1])) && cells.length < 12) {
       const text = textFromXml(cellMatch[1].replace(/<w:tcPr>[\s\S]*?<\/w:tcPr>/, '')).replace(/\s+/g, ' ').trim();
-      const align = /<w:jc w:val="([a-z]+)"\/>/.exec(cellMatch[1])?.[1] || null;
+      const cellAlign = /<w:tcPr\b[^>]*>([\s\S]*?)<\/w:tcPr>/.exec(cellMatch[1])?.[1] || '';
+      const align = /<w:pPr\b[^>]*>([\s\S]*?)<\/w:pPr>/.exec(cellMatch[1])?.[1];
+      const paragraphAlign = align ? /<w:jc\b[^>]*w:val="([a-z]+)"/.exec(align)?.[1] : null;
+      const cellVerticalAlign = /<w:vAlign\b[^>]*w:val="([a-z]+)"/.exec(cellAlign)?.[1] || null;
       const refs = imageRefs(cellMatch[1]);
-      cells.push({ text, align, images: refs.map((id) => images[id]).filter(Boolean).slice(0, 2) });
+      cells.push({ text, align: paragraphAlign, verticalAlign: cellVerticalAlign, images: refs.map((id) => images[id]).filter(Boolean).slice(0, 2) });
     }
     rows.push(cells);
   }
-  return { rows, headerRows };
+  return { rows, headerRows, tableAlign };
 }
 
 /**
@@ -343,13 +348,15 @@ export function buildPreviewPages(documentXml, styles, config, images = {}, numb
       }
       const mathLines = segmentRuns.reduce((sum, run) => sum + (run.math ? (run.display ? 3 : 0.5) : 0), 0);
       const refs = imageRefs(block.xml);
+      const isObjectCaption = /^\s*(?:gambar|figure|tabel|table)\s+[\dIVXL]+(?:[.:\s]|$)/i.test(p.plainText);
+      const isCenteredObjectParagraph = p.hasImage || isObjectCaption;
       const previewBlock = {
         id: `${key}-${segIndex}`,
         blockIndex: block.index,
         type: 'paragraph',
         text: text.slice(0, MAX_TEXT_BLOCK),
         runs: segmentRuns,
-        alignment: inCover
+        alignment: inCover || isCenteredObjectParagraph
           ? 'center'
           : bottomFrame ? (p.alignment || 'right')
           : formatted && formatOptions.alignment
@@ -440,7 +447,7 @@ export function buildPreviewPages(documentXml, styles, config, images = {}, numb
       newPage();
       pendingBreak = false;
     }
-    const { rows, headerRows } = tableForPreview(block.xml, images);
+    const { rows, headerRows, tableAlign } = tableForPreview(block.xml, images);
     const rowCount = rows.length || 1;
     const lines = Math.min(linesPerPage, rowCount * 2);
     pushBlock(
@@ -451,6 +458,7 @@ export function buildPreviewPages(documentXml, styles, config, images = {}, numb
         isMemberTable: /<w:tblCaption\b[^>]*w:val="RapiMakalah Cover Members"/.test(block.xml),
         rows,
         headerRows,
+        tableAlign,
         isEmpty: rows.length === 0,
         isCover: inCover,
       },

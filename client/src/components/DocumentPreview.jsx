@@ -107,8 +107,19 @@ function PreviewTable({ block }) {
     );
   }
   return (
-    <div className="my-2 overflow-hidden" style={{ textAlign: block.isCover ? 'center' : undefined }}>
-      <table ref={tableRef} className={block.isMemberTable ? 'cover-members' : undefined}>
+    <div
+      className="my-2 w-full overflow-hidden"
+      style={{ textAlign: 'center' }}
+    >
+      <table
+        ref={tableRef}
+        className={block.isMemberTable ? 'cover-members' : undefined}
+        style={{
+          width: block.isMemberTable ? '90%' : 'fit-content',
+          maxWidth: '100%',
+          marginInline: 'auto',
+        }}
+      >
         <tbody>
           {block.rows.map((row, rowIndex) => (
             <tr key={rowIndex}>
@@ -118,7 +129,8 @@ function PreviewTable({ block }) {
                   className="text-ink-800"
                   style={{
                     fontWeight: block.headerRows && rowIndex < block.headerRows ? 600 : undefined,
-                    textAlign: cell.align === 'center' ? 'center' : cell.align === 'right' ? 'right' : undefined,
+                    textAlign: cell.align === 'center' ? 'center' : cell.align === 'right' ? 'right' : cell.align === 'both' ? 'justify' : cell.align === 'left' ? 'left' : undefined,
+                    verticalAlign: cell.verticalAlign || undefined,
                   }}
                 >
                   {cell.images?.map((src, imageIndex) => (
@@ -213,15 +225,16 @@ export const DocumentPreview = forwardRef(function DocumentPreview(
             >
               <span
                 className="block whitespace-pre-wrap"
-                style={
-                  severity
+                style={{
+                  ...(block.hasImage || /^(?:gambar|figure|tabel|table)\s+[\dIVXL]+(?:[.:\s]|$)/i.test(block.text) ? { textAlign: 'center' } : {}),
+                  ...(severity
                     ? {
                         backgroundColor: severity === 'error' ? 'rgba(254, 226, 226, 0.65)' : 'rgba(254, 243, 199, 0.65)',
                         boxShadow: `inset 0 0 0 2px ${severity === 'error' ? '#fca5a5' : '#fcd34d'}`,
                         borderRadius: 2,
                       }
-                    : undefined
-                }
+                    : {})
+                }}
               >
                 {block.numberMarker && !block.isCover ? (
                   <span
@@ -232,7 +245,21 @@ export const DocumentPreview = forwardRef(function DocumentPreview(
                   </span>
                 ) : null}
                 {block.images?.map((src, index) => (
-                  <img key={index} src={src} alt="" className="my-2 max-w-full object-contain" style={block.imageSizes?.[index] ? { width: block.imageSizes[index].w * pxPerCm, height: block.imageSizes[index].h * pxPerCm, display: block.alignment === 'center' ? 'block' : undefined, marginLeft: block.alignment === 'center' ? 'auto' : undefined, marginRight: block.alignment === 'center' ? 'auto' : undefined } : undefined} />
+                  <img
+                    key={index}
+                    src={src}
+                    alt=""
+                    className="my-2 max-w-full object-contain"
+                    style={{
+                      ...(block.imageSizes?.[index] ? {
+                        width: block.imageSizes[index].w * pxPerCm,
+                        height: block.imageSizes[index].h * pxPerCm,
+                      } : {}),
+                      display: block.hasImage ? 'block' : undefined,
+                      marginLeft: block.hasImage ? 'auto' : undefined,
+                      marginRight: block.hasImage ? 'auto' : undefined,
+                    }}
+                  />
                 ))}
                 {block.text || block.runs?.some(run => run.math)
                   ? block.tabs?.some((t) => t.val === 'right') && block.text.includes('\t')
