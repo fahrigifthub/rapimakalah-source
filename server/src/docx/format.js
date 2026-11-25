@@ -826,6 +826,12 @@ export async function formatDocument(inputBuffer, { config, options = {}, bounda
       edits.push({ block, xml: normalizeCoverParagraph(block.xml) });
       continue;
     }
+    // An empty paragraph is a block boundary, not a continuation of the prior
+    // list item. Clear the carried list indent so following prose returns to
+    // the template's normal paragraph indentation.
+    if (!block.data.plainText.trim() && !block.data.hasNumbering) {
+      listContinuationIndent = null;
+    }
     if (prefaceEmpty.has(block.index)) {
       edits.push({ block, xml: '' });
       continue;

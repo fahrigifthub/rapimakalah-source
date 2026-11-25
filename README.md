@@ -8,6 +8,22 @@
 
 **Versi:** 1.0.0 | **Tech stack:** React + Vite, Express, Prisma, JSZip/OOXML | **Nama internal kode:** Paperly
 
+## Tangkapan Layar
+
+| Beranda | Dashboard |
+| --- | --- |
+| ![Beranda RapiMakalah](docs/screenshots/01-beranda.png) | ![Dashboard pengguna](docs/screenshots/03-dashboard.png) |
+
+| Pemeriksaan format | Hasil formatting |
+| --- | --- |
+| ![Pemeriksaan format](docs/screenshots/06-pemeriksaan.png) | ![Hasil formatting](docs/screenshots/07-hasil-format.png) |
+
+| Workspace menulis | Panel administrator |
+| --- | --- |
+| ![Workspace menulis](docs/screenshots/11-menulis.png) | ![Panel administrator](docs/screenshots/12-admin.png) |
+
+Seluruh tangkapan layar tersedia di [`docs/screenshots`](docs/screenshots) dan dipakai sebagai gambar pada manual book.
+
 ## Changelog
 
 Workspace Menulis memakai susunan ribbon terinspirasi Word: File, Beranda, Sisipkan, Tata Letak, Tampilan, dan tab kontekstual Tabel/Gambar. Font (Times New Roman, Arial, Calibri, Cambria, Georgia, Verdana), ukuran 8–72 pt, warna teks, sorotan, coret dan hapus format tersedia di Beranda; format tersebut ikut tersimpan dan diekspor ke DOCX. Panel navigasi dapat mencari paragraf dan melompat ke heading. Status bar menampilkan jumlah kata/halaman dan zoom (sesuaikan layar, 50–150%); tersedia mode fokus. Zoom-fit menskalakan halaman dan kontennya bersama agar tampilan serta jumlah halaman konsisten di HP dan laptop. Analisis desain, referensi Microsoft, dan daftar fitur lanjutan yang belum tersedia ada di [docs/word-workspace-design.md](docs/word-workspace-design.md). Workspace ini belum memiliki seluruh kemampuan Microsoft Word.
